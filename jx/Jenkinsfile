@@ -75,7 +75,7 @@ pipeline {
                     withProxyEnv() {
                         script {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
-                            sh 'jx create git server bitbucketserver -n BitBucket ' + parameters.gitBitbucketServer
+                            sh 'jx create git server --kind bitbucketserver --name BitBucket --url ' + parameters.gitBitbucketServer
                         }
                     }
                 }
