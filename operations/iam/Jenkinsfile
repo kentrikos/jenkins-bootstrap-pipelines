@@ -12,7 +12,7 @@ pipeline {
         }
         stage('Init') {
             steps {
-                dir("ops/global/iam/portal") {
+                dir("operations/$AWS_REGION/iam") {
                     withProxyEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '/usr/bin/terraform init -input=false'
@@ -23,10 +23,10 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                dir("ops/global/iam/portal") {
+                dir("operations/$AWS_REGION/iam") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform plan -out=tfplan -input=false'
+                            sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
                         }
                     }
                 }
@@ -38,10 +38,10 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("ops/global/iam/portal") {
+                dir("operations/$AWS_REGION/iam") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform apply -input=false tfplan'
+                            sh '/usr/bin/terraform apply -var-file="../terraform.tfvars" -input=false tfplan'
                         }
                     }
                     archiveArtifacts artifacts: 'outputs/**'

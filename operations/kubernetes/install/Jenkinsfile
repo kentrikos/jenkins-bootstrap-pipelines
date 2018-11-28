@@ -10,7 +10,7 @@ pipeline {
         }
         stage('Init') {
             steps {
-                dir("ops/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
@@ -26,10 +26,10 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                dir("ops/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform plan -out=tfplan -input=false'
+                            sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
                         }
                     }
                 }
@@ -41,10 +41,10 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("ops/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform apply -input=false tfplan'
+                            sh '/usr/bin/terraform apply -var-file="../terraform.tfvars" -input=false tfplan'
                         }
                     }
                 }

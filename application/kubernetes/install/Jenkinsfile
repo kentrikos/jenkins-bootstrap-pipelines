@@ -104,7 +104,7 @@ pipeline {
                             pushd ${CONFIG_REPO_DIR}
                             pushd application/${AWS_REGION}/env
 
-                            terraform plan -out=tfplan -input=false
+                            terraform plan -out=tfplan -var-file="../terraform.tfvars" -input=false
                             popd
                             popd
                             '''
@@ -129,7 +129,7 @@ pipeline {
                             pushd application/${AWS_REGION}/env
 
                             # CREATE:
-                            terraform apply -input=false tfplan
+                            terraform apply -input=false -var-file="../terraform.tfvars" tfplan
                             
                             # DESTROY:
                             #terraform destroy -auto-approve
