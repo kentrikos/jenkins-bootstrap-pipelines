@@ -66,7 +66,7 @@ def r53WildcardRecord = [
                 Type: "A",
                 AliasTarget: [
                     HostedZoneId: "",
-                    DNSName: ""
+                    DNSName: "",
                     EvaluateTargetHealth: false
                 ]
         ]
