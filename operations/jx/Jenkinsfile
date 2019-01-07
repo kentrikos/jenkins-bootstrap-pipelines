@@ -143,7 +143,7 @@ pipeline {
 
                             ingressNLBAddress = sh(script: " kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname' ",
                                                    returnStdout: true).trim()
-                            ingressNLBHostedZoneID = sh(script: " aws elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text ",
+                            ingressNLBHostedZoneID = sh(script: " aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text ",
                                                    returnStdout: true).trim()
                             r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.HostedZoneId = ingressNLBHostedZoneID
                             r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.DNSName = ingressNLBAddress
