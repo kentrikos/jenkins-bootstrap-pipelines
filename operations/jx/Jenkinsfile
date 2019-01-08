@@ -154,7 +154,8 @@ pipeline {
 
                             println "Generating record for DNS update"
                             def r53WildcardRecordJSON = JsonOutput.toJson(r53WildcardRecord)
-                            writeJSON file: 'jx_r53_alias.json', json: r53WildcardRecordJSON, pretty: 4
+                            r53WildcardRecordJSON = JsonOutput.prettyPrint(r53WildcardRecordJSON)
+                            writeFile file: 'jx_r53_alias.json', text: r53WildcardRecordJSON
                             sh "cat jx_r53_alias.json"
 
                             println "Creating/updating Route53 entry"
