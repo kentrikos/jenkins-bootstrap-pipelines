@@ -1,5 +1,7 @@
 #!groovy
 
+import groovy.json.JsonOutput
+
 def helmRbacConfig = '''
 apiVersion: v1
 kind: ServiceAccount
