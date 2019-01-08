@@ -137,20 +137,26 @@ pipeline {
                         script {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
 
-                            def r53DomainName = sh(script: " aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name' ", 
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim()
                             r53WildcardRecord.Changes.ResourceRecordSet.Name = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
 
-                            ingressNLBAddress = sh(script: " kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname' ",
+                            println "Getting ingress NLB information"
+                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
                                                    returnStdout: true).trim()
-                            ingressNLBHostedZoneID = sh(script: " aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text ",
+                            ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
                                                    returnStdout: true).trim()
                             r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.HostedZoneId = ingressNLBHostedZoneID
                             r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.DNSName = ingressNLBAddress
 
-                            writeJSON file: 'jx_r53_alias.json', json: r53WildcardRecord, pretty: 4
-                            
-                            sh 'cat jx_r53_alias.json'
+                            println "Generating record for DNS update"
+                            def r53WildcardRecordJSON = JsonOutput.toJson(r53WildcardRecord)
+                            writeJSON file: 'jx_r53_alias.json', json: r53WildcardRecordJSON, pretty: 4
+                            sh "cat jx_r53_alias.json"
+
+                            println "Creating/updating Route53 entry"
+                            sh "echo aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
                         }
                     }
                 }
