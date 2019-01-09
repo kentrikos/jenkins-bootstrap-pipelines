@@ -120,18 +120,6 @@ pipeline {
                 }
             }
         }
-        stage('Init jx tool') {
-            steps {
-                dir("operations/$AWS_REGION/env") {
-                    withProxyEnv() {
-                        script {
-                            def parameters = readYaml file: 'jenkins/parameters.yaml'
-                            sh 'jx create git server --kind bitbucketserver --name BitBucket --url ' + parameters.gitBitbucketServer + ' ||true'
-                        }
-                    }
-                }
-            }
-        }
         stage('Create wildcard DNS record') {
             steps {
                 dir("operations/$AWS_REGION/env") {
@@ -159,7 +147,7 @@ pipeline {
                             sh "cat jx_r53_alias.json"
 
                             println "Creating/updating Route53 entry"
-                            sh "echo aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
                         }
                     }
                 }
