@@ -59,22 +59,6 @@ def jxValueMap = [
         ]
 ]
 
-def r53WildcardRecord = [
-    Comment: "Creating Alias resource record sets in Route 53",
-    Changes: [{
-        Action: "UPSERT",
-            ResourceRecordSet: [
-                Name: "",
-                Type: "A",
-                AliasTarget: [
-                    HostedZoneId: "",
-                    DNSName: "",
-                    EvaluateTargetHealth: false
-                ]
-        ]
-    }]
-]
-
 def converterPy = '''
 import yaml
 import io
@@ -130,19 +114,32 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim()
-                            r53WildcardRecord.Changes.ResourceRecordSet.Name = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
+                            r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
 
                             println "Getting ingress NLB information"
                             ingressNLBAddress = sh(script: "kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
                                                    returnStdout: true).trim()
                             ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
                                                    returnStdout: true).trim()
-                            r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.HostedZoneId = ingressNLBHostedZoneID
-                            r53WildcardRecord.Changes.ResourceRecordSet.AliasTarget.DNSName = ingressNLBAddress
 
                             println "Generating record for DNS update"
-                            def r53WildcardRecordJSON = JsonOutput.toJson(r53WildcardRecord)
-                            r53WildcardRecordJSON = JsonOutput.prettyPrint(r53WildcardRecordJSON)
+                            def r53WildcardRecordJSON = """
+                            {
+                                "Comment": "Creating Alias resource record sets in Route 53",
+                                "Changes": [{
+                                    "Action": "UPSERT",
+                                    "ResourceRecordSet": {
+                                        "Name": "${r53WildcardRecordName}",
+                                        "Type": "A",
+                                        "AliasTarget": {
+                                            "HostedZoneId": "${ingressNLBHostedZoneID}",
+                                            "DNSName": "${ingressNLBAddress}",
+                                            "EvaluateTargetHealth": false
+                                        }
+                                    }
+                                }]
+                            }
+                            """
                             writeFile file: 'jx_r53_alias.json', text: r53WildcardRecordJSON
                             sh "cat jx_r53_alias.json"
 
