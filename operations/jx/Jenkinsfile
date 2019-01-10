@@ -61,7 +61,7 @@ def jxValueMap = [
 
 def r53WildcardRecord = [
     Comment: "Creating Alias resource record sets in Route 53",
-    Changes: [[
+    Changes: [{
         Action: "UPSERT",
             ResourceRecordSet: [
                 Name: "",
@@ -72,7 +72,7 @@ def r53WildcardRecord = [
                     EvaluateTargetHealth: false
                 ]
         ]
-    ]]
+    }]
 ]
 
 def converterPy = '''
