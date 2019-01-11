@@ -113,7 +113,7 @@ pipeline {
 
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
-                                                   returnStdout: true).trim()
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
                             r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
 
                             println "Getting ingress NLB information"
@@ -160,7 +160,7 @@ pipeline {
 
                                 println "Getting domain name"
                                 def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
-                                                       returnStdout: true).trim()
+                                                       returnStdout: true).trim().replaceAll("\\.\$", "")
                                 
                                 URI url_http_proxy = new URI(env.http_proxy)
                                 URI url_https_proxy = new URI(env.https_proxy)
