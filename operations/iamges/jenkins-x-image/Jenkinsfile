@@ -1,0 +1,60 @@
+#!groovy
+
+pipeline {
+    agent any
+    stages {
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git url: 'https://github.com/radepal/jenkins-x-kentrikos.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                withProxyEnv() {
+                    sh 'docker build -t jenkins-x-kentrikos  .'
+                }
+            }
+        }
+        stage('Tag') {
+            steps {
+                withProxyEnv() {
+                    sh 'docker tag jenkins-x-kentrikos $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/jenkins-x-image'
+
+                }
+            }
+        }
+        stage('Push') {
+            steps {
+                withProxyEnv() {
+                    sh 'eval $(aws ecr get-login --no-include-email --region $AWS_REGION | sed "s|https://||")'
+                    sh 'docker push  $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/jenkins-x-image'
+                }
+            }
+        }
+    }
+}
+
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'absolute', path: '/proxy', recursive: true, regionName: "$AWS_REGION") {
+        script {
+            if (env.PROXY_HTTP) {
+                proxies << "http_proxy=$PROXY_HTTP"
+            }
+            if (env.PROXY_HTTPs) {
+                proxies << "https_proxy=$PROXY_HTTPS"
+            }
+            if (env.PROXY_NO) {
+                proxies << "no_proxy=$PROXY_NO"
+            }
+            envVaraibles.addAll(proxies)
+        }
+    }
+    envVaraibles.addAll(envVars)
+
+    withEnv(envVaraibles) {
+        body.call()
+    }
+}
