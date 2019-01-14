@@ -1,5 +1,7 @@
 #!groovy
 
+import groovy.json.JsonOutput
+
 def helmRbacConfig = '''
 apiVersion: v1
 kind: ServiceAccount
@@ -104,21 +106,50 @@ pipeline {
                 }
             }
         }
-        stage('Init jx tool') {
+        stage('Create wildcard DNS record') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         script {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
-                            sh 'jx create git server --kind bitbucketserver --name BitBucket --url ' + parameters.gitBitbucketServer + ' ||true'
+
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
+
+                            println "Getting ingress NLB information"
+                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
+                                                   returnStdout: true).trim()
+                            ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
+                                                   returnStdout: true).trim()
+
+                            println "Generating record for DNS update"
+                            def r53WildcardRecordJSON = """
+                            {
+                                "Comment": "Creating Alias resource record sets in Route 53",
+                                "Changes": [{
+                                    "Action": "UPSERT",
+                                    "ResourceRecordSet": {
+                                        "Name": "${r53WildcardRecordName}",
+                                        "Type": "A",
+                                        "AliasTarget": {
+                                            "HostedZoneId": "${ingressNLBHostedZoneID}",
+                                            "DNSName": "${ingressNLBAddress}",
+                                            "EvaluateTargetHealth": false
+                                        }
+                                    }
+                                }]
+                            }
+                            """
+                            writeFile file: 'jx_r53_alias.json', text: r53WildcardRecordJSON
+                            sh "cat jx_r53_alias.json"
+
+                            println "Creating/updating Route53 entry"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
                         }
                     }
                 }
-            }
-        }
-        stage('Manual create domain') {
-            steps {
-                input message: "Create an domain defained for jx installation in Route53. Should we continue?", ok: "Yes, we should."
             }
         }
         stage('Install jx on k8s') {
@@ -128,6 +159,11 @@ pipeline {
                         withProxyEnv() {
                             script {
                                 def parameters = readYaml file: 'jenkins/parameters.yaml'
+
+                                println "Getting domain name"
+                                def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                       returnStdout: true).trim().replaceAll("\\.\$", "")
+                                
                                 URI url_http_proxy = new URI(env.http_proxy)
                                 URI url_https_proxy = new URI(env.https_proxy)
                                 def jenkins_no_proxy =  env.no_proxy.toString()
@@ -138,8 +174,7 @@ pipeline {
                                 writeFile file: 'convert.py', text: converterPy
                                 sh 'python -u convert.py'
                                 sh 'sed -i "s/\\\\\\\\\\\\\\\\/\\\\\\\\/g" myvalues.yaml '
-                                sh 'jx install -b --headless --default-admin-password ' + parameters.defaultAdminPassword + ' --domain="' + parameters.jxDomain + '" --verbose=true --provider=kubernetes --no-default-environments --git-username=' + parameters.gitUsername + ' --git-api-token ' + parameters.gitApiToken + ' --git-provider-url="' + parameters.gitProviderUrl + '"'
-                            }
+                                sh 'jx install -b --headless --default-admin-password ' + parameters.defaultAdminPassword + ' --domain="' + parameters.jxDomainAliasPrefix + "." + r53DomainName + '" --verbose=true --provider=kubernetes --no-default-environments --git-username=' + parameters.gitUsername + ' --git-api-token ' + parameters.gitApiToken + ' --git-provider-url="' + parameters.gitProviderUrl + '"'                            }
                         }
                     }
                 }
