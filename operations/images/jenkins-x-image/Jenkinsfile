@@ -6,7 +6,7 @@ pipeline {
         stage('Git clone') {
             steps {
                 cleanWs()
-                git url: 'https://github.com/radepal/jenkins-x-kentrikos.git'
+                git url: 'https://github.com/kentrikos/jenkins-x-image.git'
             }
         }
         stage('Build') {
