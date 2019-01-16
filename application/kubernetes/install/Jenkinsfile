@@ -71,6 +71,7 @@ pipeline {
                     withCustomEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
+                            pushd ${CONFIG_REPO_DIR}
                             pushd application/${AWS_REGION}/env
                             terraform init \
                                 -backend-config=\"region=${AWS_REGION}\" \
@@ -118,10 +119,6 @@ pipeline {
                             # CREATE:
                             terraform apply -input=false tfplan
                             
-                            # DESTROY:
-                            #terraform destroy -var-file="../terraform.tfvars" -auto-approve
-                            #kops --state s3://kops-${AWS_APPLICATION_ACCOUNT_NUMBER}-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE} delete cluster ${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}.k8s.local --yes
-
                             popd
                             '''
                         }
