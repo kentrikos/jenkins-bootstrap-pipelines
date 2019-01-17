@@ -60,6 +60,29 @@ pipeline {
                 }
             }
         }
+        stage('Kops check') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            sh '''#!/bin/bash -x
+                            /usr/bin/terraform apply -input=false tfplandestroy
+                            K8S_CLUSTER_NAME="${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-ops.k8s.local"
+                            KOPS_STATE_BUCKET="kops-${AWS_OPERATIONS_ACCOUNT_NUMBER}-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-ops"
+                            if kops --state s3://${KOPS_STATE_BUCKET} get cluster ${K8S_CLUSTER_NAME};
+                            then
+                              echo "Seems that Terraform has not destroyed the cluster, perhaps it was not fully deployed and marked as tainted resource."
+                              echo "Deleting directly with kops..."
+                              kops --state s3://${KOPS_STATE_BUCKET} delete cluster ${K8S_CLUSTER_NAME} --yes
+                            else
+                              echo "Looks like the cluster has beed finally destroyed."
+                            fi
+                            '''
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 void withProxyEnv(List envVars = [],  def body) {
