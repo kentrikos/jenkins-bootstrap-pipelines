@@ -56,7 +56,6 @@ pipeline {
                     ansiColor('xterm') {
                         withProxyEnv() {
                             sh '''#!/bin/bash -x
-                            /usr/bin/terraform apply -input=false tfplandestroy
                             K8S_CLUSTER_NAME="${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-ops.k8s.local"
                             KOPS_STATE_BUCKET="kops-${AWS_OPERATIONS_ACCOUNT_NUMBER}-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-ops"
                             if kops --state s3://${KOPS_STATE_BUCKET} get cluster ${K8S_CLUSTER_NAME};
