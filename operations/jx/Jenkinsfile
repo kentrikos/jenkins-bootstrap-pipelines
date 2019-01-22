@@ -37,7 +37,7 @@ controller:
 def jxValueMap = [
         jenkins: [
                 Master: [
-                        Image: env.AWS_REGION + ".dkr.ecr."+ env.AWS_REGION + ".amazonaws.com/jenkins-x-image",
+                        Image: env.AWS_OPERATIONS_ACCOUNT_NUMBER + ".dkr.ecr."+ env.AWS_REGION + ".amazonaws.com/jenkins-x-image",
                         ImageTag: "latest",
                         InitContainerEnv: [],
                         ContainerEnv:[],
