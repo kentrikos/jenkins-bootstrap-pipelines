@@ -1,5 +1,8 @@
 #!groovy
 pipeline {
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
     agent any
     stages {
         stage('Git clone') {

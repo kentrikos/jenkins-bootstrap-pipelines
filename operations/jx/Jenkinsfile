@@ -70,9 +70,6 @@ with io.open('myvalues.yaml', 'w', encoding='utf8') as outfile:
    yaml.dump(data_loaded, outfile, default_flow_style=False, default_style='"')
 '''
 pipeline {
-    options {
-        timeout(time: 60, unit: 'MINUTES')
-    }
     agent any
     stages {
         stage('Git local config') {
