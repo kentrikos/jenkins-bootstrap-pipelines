@@ -63,7 +63,7 @@ pipeline {
                               "basicAuthPassword": "admin"
                             }
                             """
-                            sh "curl --user admin:${grafanaAdminPassword} ${grafanaEndpoint}/api/datasources -X POST -H 'Content-Type: application/json;charset=UTF-8' --data-binary '${requestJson}'"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} ${grafanaEndpoint}/api/datasources -X POST -H 'Content-Type: application/json;charset=UTF-8' --data-binary '${requestJson}'"
                         }
                     }
                 }
