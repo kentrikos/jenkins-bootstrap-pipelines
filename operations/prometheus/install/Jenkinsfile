@@ -50,7 +50,7 @@ pipeline {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
-                            def grafanaAdminPassword = parameters.defaultAdminPassword
+                            def grafanaAdminPassword = grafanaParameters.defaultAdminPassword
                             def requestJson = """
                             {
                               "name": "Prometheus_ops",
