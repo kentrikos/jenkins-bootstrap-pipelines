@@ -37,8 +37,8 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            def prometheusEndpoint = "http://prometheus.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
-                            def grafanaEndpoint = "http://grafana.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            prometheusEndpoint = "http://prometheus.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            grafanaEndpoint = "http://grafana.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
                         }
                     }
                 }
@@ -56,7 +56,7 @@ pipeline {
                               "name": "Prometheus_ops",
                               "isDefault": false,
                               "type": "prometheus",
-                              "url": "",
+                              "url": "${prometheusEndpoint}",
                               "access": "proxy",
                               "basicAuth": true,
                               "basicAuthUser": "admin",
