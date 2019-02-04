@@ -54,7 +54,7 @@ pipeline {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
-                            sh "curl --verbose --user admin:${grafanaAdminPassword} ${grafanaEndpoint}/api/datasources/name:${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} ${grafanaEndpoint}/api/datasources/name/:${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
                         }
                     }
                 }
