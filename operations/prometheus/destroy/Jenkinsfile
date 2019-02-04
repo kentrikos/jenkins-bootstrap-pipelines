@@ -21,7 +21,10 @@ pipeline {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         script {
-                            sh "jx delete addon prometheus"
+                            sh '''#!/bin/bash -x
+                            jx delete addon prometheus
+                            kubectl -n jx delete secret prometheus-ingress
+                            '''
                         }
                     }
                 }
