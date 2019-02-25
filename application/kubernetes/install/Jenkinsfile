@@ -71,13 +71,13 @@ pipeline {
                     withCustomEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
-                            pushd ${CONFIG_REPO_DIR}
                             pushd application/${AWS_REGION}/env
                             terraform init \
                                 -backend-config=\"region=${AWS_REGION}\" \
-                                -backend-config=\"bucket=tf-state-bootstrap-${AWS_APPLICATION_ACCOUNT_NUMBER}-application-${AWS_REGION}\" \
+                                -backend-config=\"bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
                                 -backend-config=\"key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/env/terraform.tfstate\" \
-                                -backend-config=\"role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KopsCrossAccount\"
+                                -backend-config=\"dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
+                                -backend-config=\"role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount\"
                             popd
                             '''
                         }
@@ -158,7 +158,7 @@ void withCustomEnv(List envVars = [],  def body) {
     List envVariables = [
         'GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no'
     ]
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'absolute', path: '/proxy', recursive: true, regionName: "$AWS_REGION") {
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
         script {
             if (env.PROXY_HTTP) {
                 proxies << "http_proxy=$PROXY_HTTP"

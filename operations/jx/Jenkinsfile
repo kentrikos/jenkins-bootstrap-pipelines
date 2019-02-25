@@ -37,11 +37,10 @@ controller:
 def jxValueMap = [
         jenkins: [
                 Master: [
-                        Image: env.AWS_OPERATIONS_ACCOUNT_NUMBER + ".dkr.ecr."+ env.AWS_REGION + ".amazonaws.com/jenkins-x-image",
+                        Image: env.AWS_OPERATIONS_ACCOUNT_NUMBER + ".dkr.ecr."+ env.AWS_REGION + ".amazonaws.com/"+ env.PRODUCT_DOMAIN_NAME + "-" + env.ENVIRONMENT_TYPE +"-jenkins-x-image",
                         ImageTag: "latest",
                         InitContainerEnv: [],
-                        ContainerEnv:[],
-                        InstallPlugins: ["ssh-agent:1.17","aws-parameter-store:1.2.1"]
+                        ContainerEnv:[]
                 ],
                 Servers: [
                         Global: [
@@ -61,14 +60,6 @@ def jxValueMap = [
         ]
 ]
 
-def converterPy = '''
-import yaml
-import io
-with open("data.yaml", 'r') as stream:
-   data_loaded = yaml.load(stream)
-with io.open('myvalues.yaml', 'w', encoding='utf8') as outfile:
-   yaml.dump(data_loaded, outfile, default_flow_style=False, default_style='"')
-'''
 pipeline {
 
     agent any
@@ -171,9 +162,7 @@ pipeline {
                                 jxValueMap.jenkins.Master.ContainerEnv = [[name: 'http_proxy', value: env.http_proxy],[name: 'https_proxy', value: env.http_proxy],[name: 'no_proxy', value: env.no_proxy],[name: 'jenkins_proxy_http', value: url_http_proxy?.getHost()],[name: 'jenkins_proxy_http_port', value:  url_http_proxy?.getPort().toString()],[name: 'jenkins_no_proxy_list', value: jenkins_no_proxy.split(',').join('\\n')],[name: 'JOB_REPO_URL', value: env.JOB_REPO_URL]]
                                 jxValueMap.jenkins.Master.JavaOpts='-Dhudson.slaves.NodeProvisioner.initialDelay=0 -Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Djenkins.displayurl.provider=org.jenkinsci.plugins.blueoceandisplayurl.BlueOceanDisplayURLImpl -Dhttp.proxyHost='+ url_http_proxy?.getHost()+' -Dhttp.proxyPort='+ url_http_proxy?.getPort()
                                 writeYaml file: 'myvalues.yaml', data: jxValueMap
-                              //  writeFile file: 'convert.py', text: converterPy
-                             //   sh 'python -u convert.py'
-                              //  sh 'sed -i "s/\\\\\\\\\\\\\\\\/\\\\\\\\/g" myvalues.yaml '
+
                                 sh 'jx install -b --headless --default-admin-password ' + parameters.defaultAdminPassword + ' --domain="' + parameters.jxDomainAliasPrefix + "." + r53DomainName + '" --verbose=true --provider=kubernetes --no-default-environments --git-username=' + parameters.gitUsername + ' --git-api-token ' + parameters.gitApiToken + ' --git-provider-url="' + parameters.gitProviderUrl + '"'                            }
                         }
                     }
@@ -186,7 +175,7 @@ pipeline {
 void withProxyEnv(List envVars = [], def body) {
     List proxies = []
     List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'absolute', path: '/proxy', recursive: true, regionName: "$AWS_REGION") {
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
         script {
             if (env.PROXY_HTTP) {
                 proxies << "http_proxy=$PROXY_HTTP"

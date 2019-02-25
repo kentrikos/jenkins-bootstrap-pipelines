@@ -19,7 +19,7 @@ pipeline {
         stage('Tag') {
             steps {
                 withProxyEnv() {
-                    sh 'docker tag jenkins-x-kentrikos $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/jenkins-x-image'
+                    sh 'docker tag jenkins-x-kentrikos $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-jenkins-x-image'
 
                 }
             }
@@ -28,7 +28,7 @@ pipeline {
             steps {
                 withProxyEnv() {
                     sh 'eval $(aws ecr get-login --no-include-email --region $AWS_REGION | sed "s|https://||")'
-                    sh 'docker push  $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/jenkins-x-image'
+                    sh 'docker push  $AWS_OPERATIONS_ACCOUNT_NUMBER.dkr.ecr.$AWS_REGION.amazonaws.com/${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-jenkins-x-image'
                 }
             }
         }
@@ -38,7 +38,7 @@ pipeline {
 void withProxyEnv(List envVars = [], def body) {
     List proxies = []
     List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'absolute', path: '/proxy', recursive: true, regionName: "$AWS_REGION") {
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
         script {
             if (env.PROXY_HTTP) {
                 proxies << "http_proxy=$PROXY_HTTP"
