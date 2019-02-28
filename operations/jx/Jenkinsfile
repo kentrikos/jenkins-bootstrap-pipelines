@@ -82,7 +82,7 @@ pipeline {
                     withProxyEnv() {
                         writeFile file: 'helm-rbac-config.yaml', text: helmRbacConfig
                         sh 'kubectl create -f helm-rbac-config.yaml ||true'
-                        sh 'helm init --service-account tiller --wait --upgrade'
+                        sh 'helm init --service-account tiller --wait --upgrade --tiller-connection-timeout 600'
                     }
                 }
             }
@@ -162,6 +162,8 @@ pipeline {
                                 jxValueMap.jenkins.Master.ContainerEnv = [[name: 'http_proxy', value: env.http_proxy],[name: 'https_proxy', value: env.http_proxy],[name: 'no_proxy', value: env.no_proxy],[name: 'jenkins_proxy_http', value: url_http_proxy?.getHost()],[name: 'jenkins_proxy_http_port', value:  url_http_proxy?.getPort().toString()],[name: 'jenkins_no_proxy_list', value: jenkins_no_proxy.split(',').join('\\n')],[name: 'JOB_REPO_URL', value: env.JOB_REPO_URL]]
                                 jxValueMap.jenkins.Master.JavaOpts='-Dhudson.slaves.NodeProvisioner.initialDelay=0 -Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Djenkins.displayurl.provider=org.jenkinsci.plugins.blueoceandisplayurl.BlueOceanDisplayURLImpl -Dhttp.proxyHost='+ url_http_proxy?.getHost()+' -Dhttp.proxyPort='+ url_http_proxy?.getPort()
                                 writeYaml file: 'myvalues.yaml', data: jxValueMap
+
+                                sh 'sed -r -i \'s/value: ([^ \'\\\'\']+)/value: "\\1"/g\' myvalues.yaml'
 
                                 sh 'jx install -b --headless --default-admin-password ' + parameters.defaultAdminPassword + ' --domain="' + parameters.jxDomainAliasPrefix + "." + r53DomainName + '" --verbose=true --provider=kubernetes --no-default-environments --git-username=' + parameters.gitUsername + ' --git-api-token ' + parameters.gitApiToken + ' --git-provider-url="' + parameters.gitProviderUrl + '"'                            }
                         }
