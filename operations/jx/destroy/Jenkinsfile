@@ -2,64 +2,6 @@
 
 import groovy.json.JsonOutput
 
-def helmRbacConfig = '''
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: tiller
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: tiller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: tiller
-    namespace: kube-system
-'''
-def ingValue = '''
-rbac:
- create: true
-
-controller:
- service:
-   annotations:
-     service.beta.kubernetes.io/aws-load-balancer-type: nlb
-     service.beta.kubernetes.io/aws-load-balancer-internal: true
-   enableHttp: true
-   enableHttps: false
-'''
-def jxValueMap = [
-        jenkins: [
-                Master: [
-                        Image: env.AWS_OPERATIONS_ACCOUNT_NUMBER + ".dkr.ecr."+ env.AWS_REGION + ".amazonaws.com/"+ env.PRODUCT_DOMAIN_NAME + "-" + env.ENVIRONMENT_TYPE +"-jenkins-x-image",
-                        ImageTag: "latest",
-                        InitContainerEnv: [],
-                        ContainerEnv:[]
-                ],
-                Servers: [
-                        Global: [
-                                NumEnvVars: 8,
-                                EnvVars   : [
-                                        CONFIG_REPO_URL               : env.CONFIG_REPO_URL,
-                                        JOB_REPO_URL                  : env.JOB_REPO_URL,
-                                        AWS_REGION                    : env.AWS_REGION,
-                                        AWS_OPERATIONS_ACCOUNT_NUMBER : env.AWS_OPERATIONS_ACCOUNT_NUMBER,
-                                        AWS_APPLICATION_ACCOUNT_NUMBER: env.AWS_APPLICATION_ACCOUNT_NUMBER,
-                                        PRODUCT_DOMAIN_NAME           : env.PRODUCT_DOMAIN_NAME,
-                                        ENVIRONMENT_TYPE              : env.ENVIRONMENT_TYPE,
-
-                                ]
-                        ]
-                ]
-        ]
-]
-
 pipeline {
 
     agent any
@@ -76,18 +18,6 @@ pipeline {
                 git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
-        stage('Init helm') {
-            steps {
-                dir("operations/$AWS_REGION/env") {
-                    withProxyEnv() {
-                        writeFile file: 'helm-rbac-config.yaml', text: helmRbacConfig
-                        sh 'kubectl create -f helm-rbac-config.yaml ||true'
-                        sh 'helm init --service-account tiller --wait --upgrade --tiller-connection-timeout 600'
-                    }
-                }
-            }
-        }
-
         stage('Remove wildcard DNS record') {
             steps {
                 dir("operations/$AWS_REGION/env") {
