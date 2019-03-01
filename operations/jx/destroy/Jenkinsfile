@@ -1,0 +1,113 @@
+#!groovy
+
+import groovy.json.JsonOutput
+
+pipeline {
+
+    agent any
+    stages {
+        stage('Git local config') {
+            steps {
+                sh 'git config --global --add user.name "example"'
+                sh 'git config --global --add user.email "example@example.com"'
+            }
+        }
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+            }
+        }
+        stage('Remove wildcard DNS record') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    withProxyEnv() {
+                        script {
+                            def parameters = readYaml file: 'jenkins/parameters.yaml'
+
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
+
+                            println "Getting ingress NLB information"
+                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
+                                                   returnStdout: true).trim()
+                            ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
+                                                   returnStdout: true).trim()
+
+                            println "Generating record for DNS update"
+                            def r53WildcardRecordJSON = """
+                            {
+                                "Comment": "Creating Alias resource record sets in Route 53",
+                                "Changes": [{
+                                    "Action": "DELETE",
+                                    "ResourceRecordSet": {
+                                        "Name": "${r53WildcardRecordName}",
+                                        "Type": "A",
+                                        "AliasTarget": {
+                                            "HostedZoneId": "${ingressNLBHostedZoneID}",
+                                            "DNSName": "${ingressNLBAddress}",
+                                            "EvaluateTargetHealth": false
+                                        }
+                                    }
+                                }]
+                            }
+                            """
+                            writeFile file: 'jx_r53_alias.json', text: r53WildcardRecordJSON
+                            sh "cat jx_r53_alias.json"
+
+                            println "Creating/updating Route53 entry"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Remove jx') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            script {
+                                sh 'jx uninstall -b --context `kubectl config current-context`'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Remove k8s ingress') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    withProxyEnv() {
+                        sh 'helm delete  jxing'
+                    }
+                }
+            }
+        }
+    }
+}
+
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
+        script {
+            if (env.PROXY_HTTP) {
+                proxies << "http_proxy=$PROXY_HTTP"
+            }
+            if (env.PROXY_HTTPS) {
+                proxies << "https_proxy=$PROXY_HTTPS"
+            }
+            if (env.PROXY_NO) {
+                proxies << "no_proxy=$PROXY_NO"
+            }
+            envVaraibles.addAll(proxies)
+        }
+    }
+    envVaraibles.addAll(envVars)
+    withEnv(envVaraibles) {
+        body.call()
+    }
+}
