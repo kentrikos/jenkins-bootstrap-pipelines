@@ -88,7 +88,7 @@ pipeline {
             }
         }
 
-        stage('Create wildcard DNS record') {
+        stage('Remove wildcard DNS record') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
