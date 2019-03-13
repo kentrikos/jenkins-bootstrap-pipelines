@@ -56,7 +56,7 @@ pipeline {
                             r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
 
                             println "Getting ingress NLB information"
-                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system jxing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
+                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system opsing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
                                                    returnStdout: true).trim()
                             ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
                                                    returnStdout: true).trim()
@@ -79,11 +79,11 @@ pipeline {
                                 }]
                             }
                             """
-                            writeFile file: 'jx_r53_alias.json', text: r53WildcardRecordJSON
-                            sh "cat jx_r53_alias.json"
+                            writeFile file: 'opsing_r53_alias.json', text: r53WildcardRecordJSON
+                            sh "cat opsing_r53_alias.json"
 
                             println "Creating/updating Route53 entry"
-                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://jx_r53_alias.json"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://opsing_r53_alias.json"
                         }
                     }
                 }
