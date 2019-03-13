@@ -1,5 +1,8 @@
 pipeline {
     agent { label 'jenkins-terraform' }
+    environment {
+        ENV_K8S_DIR = 'env-kops'
+    }
     stages {
         stage('install required software') {
             steps {
@@ -71,11 +74,11 @@ pipeline {
                     withCustomEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/env
+                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
                             terraform init \
                                 -backend-config=\"region=${AWS_REGION}\" \
                                 -backend-config=\"bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
-                                -backend-config=\"key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/env/terraform.tfstate\" \
+                                -backend-config=\"key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate\" \
                                 -backend-config=\"dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
                                 -backend-config=\"role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount\"
                             popd
@@ -92,7 +95,7 @@ pipeline {
                     withCustomEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/env
+                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
 
                             terraform plan -out=tfplan -var-file="../terraform.tfvars" -input=false
                             popd
@@ -114,7 +117,7 @@ pipeline {
                     withCustomEnv() {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/env
+                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
 
                             # CREATE:
                             terraform apply -input=false tfplan
