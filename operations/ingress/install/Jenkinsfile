@@ -89,6 +89,7 @@ pipeline {
                 }
             }
         }
+    }
 }
 
 void withProxyEnv(List envVars = [], def body) {
