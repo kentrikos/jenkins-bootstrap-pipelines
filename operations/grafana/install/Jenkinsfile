@@ -49,9 +49,8 @@ pipeline {
 
                             sh """
                             #!/bin/bash
-                            helm install --replace --wait --name grafana --namespace kube-system stable/grafana --set=\
-                            ingress.enabled=true,ingress.hosts={grafana.$grafana_address},\
-                            adminPassword=$grafana_parameters.defaultAdminPassword
+                            helm install --replace --wait --name grafana --namespace kube-system stable/grafana \
+                            --set=ingress.enabled=true,ingress.hosts={grafana.$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword
                             """
                         }
                     }
