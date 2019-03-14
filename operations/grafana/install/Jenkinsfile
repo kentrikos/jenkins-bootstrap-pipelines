@@ -45,12 +45,12 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            def grafana_address = "grafana" + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
+                            def grafana_address = "grafana." + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
 
                             sh """
                             #!/bin/bash
                             helm install --replace --wait --name grafana --namespace kube-system stable/grafana \
-                            --set=ingress.enabled=true,ingress.hosts={grafana.$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword
+                            --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword
                             """
                         }
                     }

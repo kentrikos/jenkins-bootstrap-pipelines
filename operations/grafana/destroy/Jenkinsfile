@@ -22,8 +22,7 @@ pipeline {
                     withProxyEnv() {
                         script {
                             def parameters = readYaml file: 'grafana/parameters.yaml'
-
-                            sh "jx delete addon grafana"
+                            sh "helm delete --purge grafana"
                         }
                     }
                 }
