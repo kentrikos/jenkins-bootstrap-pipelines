@@ -20,8 +20,7 @@ pipeline {
         stage('Check/create LMA namespace') {
             steps {
                 dir("operations/$AWS_REGION/env") {
-                    withProxyEnv() {
-                      script {
+                    script {
                         sh '''
                         #!/bin/bash -x
                         if ! kubectl get namespace lma;
@@ -30,7 +29,6 @@ pipeline {
                             kubectl create namespace lma
                         fi
                         '''
-                      }
                     }
                 }
             }
@@ -40,24 +38,24 @@ pipeline {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
-                      script {
-                          def grafana_parameters = readYaml file: 'grafana/parameters.yaml'
-                          def jenkins_parameters = readYaml file: 'jenkins/parameters.yaml'
+                        script {
+                            def grafana_parameters = readYaml file: 'grafana/parameters.yaml'
+                            def jenkins_parameters = readYaml file: 'jenkins/parameters.yaml'
 
-                          println "Getting domain name"
-                          def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
-                                                 returnStdout: true).trim().replaceAll("\\.\$", "")
-                          def grafana_address = "grafana" + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            def grafana_address = "grafana" + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
 
-                          sh """
-                          #!/bin/bash
-                          helm install --replace --wait --name grafana --namespace kube-system stable/grafana --set=\
-                          ingress.enabled=true,ingress.hosts={grafana.$grafana_address},\
-                          adminPassword=$grafana_parameters.defaultAdminPassword \
-                           || true
-                          """
-                      }
+                            sh """
+                            #!/bin/bash
+                            helm install --replace --wait --name grafana --namespace kube-system stable/grafana --set=\
+                            ingress.enabled=true,ingress.hosts={grafana.$grafana_address},\
+                            adminPassword=$grafana_parameters.defaultAdminPassword
+                            """
+                        }
                     }
+                }
             }
         }
     }
