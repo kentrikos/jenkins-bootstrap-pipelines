@@ -16,17 +16,48 @@ pipeline {
                 git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
+
+        stage('Check/create LMA namespace') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    withProxyEnv() {
+                      script {
+                        sh '''
+                        #!/bin/bash -x
+                        if ! kubectl get namespace lma;
+                        then 
+                            echo "Namespace for LMA does not exist, creating..."
+                            kubectl create namespace lma
+                        fi
+                        '''
+                      }
+                    }
+                }
+            }
+        }
+
         stage('Deploy Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
-                        script {
-                            def parameters = readYaml file: 'grafana/parameters.yaml'
+                      script {
+                          def grafana_parameters = readYaml file: 'grafana/parameters.yaml'
+                          def jenkins_parameters = readYaml file: 'jenkins/parameters.yaml'
 
-                            sh "jx create addon grafana --set adminPassword=" + parameters.defaultAdminPassword
-                        }
+                          println "Getting domain name"
+                          def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                 returnStdout: true).trim().replaceAll("\\.\$", "")
+                          def grafana_address = "grafana" + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
+
+                          sh """
+                          #!/bin/bash
+                          helm install --replace --wait --name grafana --namespace kube-system stable/grafana --set=\
+                          ingress.enabled=true,ingress.hosts={grafana.$grafana_address},\
+                          adminPassword=$grafana_parameters.defaultAdminPassword \
+                           || true
+                          """
+                      }
                     }
-                }
             }
         }
     }
