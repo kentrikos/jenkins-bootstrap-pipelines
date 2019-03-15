@@ -16,18 +16,18 @@ pipeline {
                 git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
-        stage('Deploy Prometheus/operations') {
+
+        stage('Switch kubectl context to ops') {
             steps {
                 dir("operations/$AWS_REGION/env") {
-                    withProxyEnv() {
-                        script {
-                            sh "jx create addon prometheus"
-                        }
+                    script {
+                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
                     }
                 }
             }
         }
-        stage('Read DNS domain') {
+
+       stage('Read DNS domain') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
@@ -37,14 +37,31 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            prometheusEndpoint = "http://prometheus.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
-                            grafanaEndpoint = "http://grafana.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            prometheusEndpoint = "http://prometheus." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            grafanaEndpoint = "http://grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
                         }
                     }
                 }
             }
         }
-        stage('Add Prometheus data-source to Grafana') {
+
+        stage('Deploy Prometheus/operations') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    withProxyEnv() {
+                        script {
+                            sh """
+                            #!/bin/bash
+                            helm install --replace --wait --name prometheus_ops --namespace kube-system stable/prometheus \
+                            --set=ingress.enabled=true,ingress.hosts={$prometheusEndpoint}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+ 
+        stage('Add Prometheus/operations data-source to Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {

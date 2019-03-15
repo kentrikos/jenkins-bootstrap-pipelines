@@ -32,7 +32,6 @@ pipeline {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         script {
-                            def parameters = readYaml file: 'grafana/parameters.yaml'
                             sh "helm delete --purge grafana"
                         }
                     }

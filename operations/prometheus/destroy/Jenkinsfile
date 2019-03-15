@@ -16,15 +16,23 @@ pipeline {
                 git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
-        stage('Destroy Prometheus') {
+
+        stage('Switch kubectl context to ops') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    script {
+                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                }
+            }
+        }
+
+        stage('Destroy Prometheus/operations') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         script {
-                            sh '''#!/bin/bash -x
-                            jx delete addon prometheus
-                            kubectl -n jx delete secret prometheus-ingress
-                            '''
+                            sh 'helm delete --purge prometheus_ops'
                         }
                     }
                 }
@@ -41,7 +49,7 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            grafanaEndpoint = "http://grafana.jx." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            grafanaEndpoint = "http://grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
                             grafanaAdminPassword = grafanaParameters.defaultAdminPassword
                         }
                     }
