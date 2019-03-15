@@ -3,6 +3,12 @@
 pipeline {
 
     agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+
     stages {
         stage('Git local config') {
             steps {
@@ -17,11 +23,24 @@ pipeline {
             }
         }
 
+        stage('Get K8s cluster flavor') {
+            steps {
+                script {
+                    if (env.K8S_FLAVOR == "eks") {
+                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                    } else {
+                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                    println K8S_CLUSTER_NAME
+                }
+            }
+        }
+
         stage('Switch kubectl context to ops') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     script {
-                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
                 }
             }
@@ -29,7 +48,7 @@ pipeline {
 
         stage('Check/create LMA namespace') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$env.K8S_FLAVOR") {
                     script {
                         sh '''
                         #!/bin/bash -x
@@ -46,7 +65,7 @@ pipeline {
 
         stage('Deploy Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$env.K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             def grafana_parameters = readYaml file: 'grafana/parameters.yaml'
