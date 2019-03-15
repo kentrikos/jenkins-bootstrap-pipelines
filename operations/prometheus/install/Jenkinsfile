@@ -40,7 +40,7 @@ pipeline {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     script {
-                      sh "kubectl config use-context $K8S_CLUSTER_NAME
+                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
                 }
             }
