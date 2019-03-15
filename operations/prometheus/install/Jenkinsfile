@@ -31,7 +31,7 @@ pipeline {
                     } else {
                       def K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
                     }
-                    println $K8S_CLUSTER_NAME
+                    println K8S_CLUSTER_NAME
                 }
             }
         }
