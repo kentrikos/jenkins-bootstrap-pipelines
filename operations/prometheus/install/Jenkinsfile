@@ -71,7 +71,7 @@ pipeline {
                         script {
                             sh """
                             #!/bin/bash
-                            helm install --replace --wait --name prometheus_ops --namespace kube-system stable/prometheus \
+                            helm install --replace --wait --name prometheus-ops --namespace kube-system stable/prometheus \
                             --set=ingress.enabled=true,ingress.hosts={$prometheusEndpoint}
                             """
                         }

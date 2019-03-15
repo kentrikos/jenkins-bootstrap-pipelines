@@ -32,7 +32,7 @@ pipeline {
                 dir("operations/$AWS_REGION/env") {
                     withProxyEnv() {
                         script {
-                            sh 'helm delete --purge prometheus_ops'
+                            sh 'helm delete --purge prometheus-ops'
                         }
                     }
                 }
