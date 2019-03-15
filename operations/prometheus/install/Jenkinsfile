@@ -72,7 +72,7 @@ pipeline {
                             sh """
                             #!/bin/bash
                             helm install --replace --wait --name prometheus-ops --namespace lma stable/prometheus \
-                            --set=ingress.enabled=true,ingress.hosts={$prometheusEndpoint}
+                            --set=server.ingress.enabled=true,server.ingress.hosts={$prometheusEndpoint}
                             """
                         }
                     }
