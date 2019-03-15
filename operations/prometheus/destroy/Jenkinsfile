@@ -49,7 +49,7 @@ pipeline {
                             println "Getting domain name"
                             def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            grafanaEndpoint = "http://grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            grafanaEndpoint = "grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
                             grafanaAdminPassword = grafanaParameters.defaultAdminPassword
                         }
                     }
@@ -62,7 +62,7 @@ pipeline {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
-                            sh "curl --verbose --user admin:${grafanaAdminPassword} ${grafanaEndpoint}/api/datasources/name/${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/datasources/name/${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
                         }
                     }
                 }
