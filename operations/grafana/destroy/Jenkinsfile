@@ -16,6 +16,17 @@ pipeline {
                 git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
+
+        stage('Switch kubectl context to ops') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    script {
+                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                }
+            }
+        }
+
         stage('Destroy Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env") {
