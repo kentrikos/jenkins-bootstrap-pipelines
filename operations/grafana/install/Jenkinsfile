@@ -17,6 +17,16 @@ pipeline {
             }
         }
 
+        stage('Switch kubectl context to ops') {
+            steps {
+                dir("operations/$AWS_REGION/env") {
+                    script {
+                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                }
+            }
+        }
+
         stage('Check/create LMA namespace') {
             steps {
                 dir("operations/$AWS_REGION/env") {
