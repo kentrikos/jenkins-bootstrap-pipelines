@@ -5,10 +5,8 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'K8S_CLUSTER_NAME', 
-               choices: ["arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops", 
-                         "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"],
-               description: 'Choose target cluster name (required for kops)')
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
     }
 
     stages {
@@ -25,11 +23,22 @@ pipeline {
             }
         }
 
+        stage('Get K8s cluster flavor') {
+            steps {
+                if (env.K8S_FLAVOR == "eks") {
+                  def K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                } else {
+                  def K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                }
+                println $K8S_CLUSTER_NAME
+            }
+        }
+
         stage('Switch kubectl context to ops') {
             steps {
                 dir("operations/$AWS_REGION/env") {
                     script {
-                      sh "kubectl config use-context $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                      sh "kubectl config use-context $K8S_CLUSTER_NAME
                     }
                 }
             }
