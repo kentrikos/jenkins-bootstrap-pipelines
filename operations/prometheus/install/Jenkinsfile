@@ -38,7 +38,7 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     script {
                       sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
@@ -48,7 +48,7 @@ pipeline {
 
        stage('Read DNS domain') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -66,7 +66,7 @@ pipeline {
 
         stage('Deploy Prometheus/operations') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             sh """
@@ -82,7 +82,7 @@ pipeline {
  
         stage('Add Prometheus/operations data-source to Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
