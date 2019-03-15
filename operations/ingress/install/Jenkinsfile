@@ -66,7 +66,7 @@ pipeline {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         writeFile file: 'ing-values.yaml', text: ingValue
-                        sh 'helm install --replace --wait --name opsing --namespace kube-system stable/nginx-ingress --set rbac.create=true --values ing-values.yaml"
+                        sh 'helm install --replace --wait --name opsing --namespace kube-system stable/nginx-ingress --set rbac.create=true --values ing-values.yaml'
                     }
                 }
             }
