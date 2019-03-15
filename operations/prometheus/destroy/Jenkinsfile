@@ -48,7 +48,7 @@ pipeline {
 
         stage('Destroy Prometheus/operations') {
             steps {
-                dir("operations/$AWS_REGION/env-$env.K8S_CLUSTER_NAME") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             sh 'helm delete --purge prometheus-ops'
@@ -59,7 +59,7 @@ pipeline {
         }
         stage('Read Grafana endpoint') {
             steps {
-                dir("operations/$AWS_REGION/env-$env.K8S_CLUSTER_NAME") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -77,7 +77,7 @@ pipeline {
         }
         stage('Destroy Prometheus_ops endpoint in Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$env.K8S_CLUSTER_NAME") {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
