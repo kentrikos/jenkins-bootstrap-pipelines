@@ -1,0 +1,108 @@
+#!groovy
+
+pipeline {
+
+    agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+
+    stages {
+        stage('Git local config') {
+            steps {
+                sh 'git config --global --add user.name "example"'
+                sh 'git config --global --add user.email "example@example.com"'
+            }
+        }
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+            }
+        }
+
+        stage('Get K8s cluster flavor') {
+            steps {
+                script {
+                    if (env.K8S_FLAVOR == "eks") {
+                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app"
+                    } else {
+                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app.k8s.local"
+                    }
+                    println K8S_CLUSTER_NAME
+                }
+            }
+        }
+
+        stage('Switch kubectl context to app') {
+            steps {
+                dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
+                    script {
+                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
+                    }
+                }
+            }
+        }
+
+        stage('Check/create LMA namespace') {
+            steps {
+                dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
+                    script {
+                        sh '''
+                        #!/bin/bash -x
+                        if ! kubectl get namespace lma;
+                        then 
+                            echo "Namespace for LMA does not exist, creating..."
+                            kubectl create namespace lma
+                        fi
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Prometheus/application') {
+            steps {
+                dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            /*
+                             * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
+                             */
+                            sh """
+                            #!/bin/bash
+                            helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
+                            --set=server.service.type:LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal:0.0.0.0/0
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
+        script {
+            if (env.PROXY_HTTP) {
+                proxies << "http_proxy=$PROXY_HTTP"
+            }
+            if (env.PROXY_HTTPS) {
+                proxies << "https_proxy=$PROXY_HTTPS"
+            }
+            if (env.PROXY_NO) {
+                proxies << "no_proxy=$PROXY_NO"
+            }
+            envVaraibles.addAll(proxies)
+        }
+    }
+    envVaraibles.addAll(envVars)
+    withEnv(envVaraibles) {
+        body.call()
+    }
+}
