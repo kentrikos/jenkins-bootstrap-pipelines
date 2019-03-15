@@ -63,6 +63,18 @@ pipeline {
                 }
             }
         }
+        stage('Retrieve kubeconfig') {
+            steps {
+                withProxyEnv() {
+                    withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                        sh '''#!/bin/bash -x
+                       aws eks update-kubeconfig --name ${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE} --region ${AWS_REGION}
+                       '''
+                    }
+                }
+            }
+        }
+
     }
 }
 void withProxyEnv(List envVars = [], def body) {

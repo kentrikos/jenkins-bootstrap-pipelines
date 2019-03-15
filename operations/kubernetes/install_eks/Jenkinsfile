@@ -57,6 +57,15 @@ pipeline {
                 }
             }
         }
+        stage('Retrieve kubeconfig') {
+            steps {
+                withProxyEnv() {
+                        sh '''#!/bin/bash -x
+                       aws eks update-kubeconfig --name ${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-ops --region ${AWS_REGION}
+                       '''
+                }
+            }
+        }
     }
 }
 void withProxyEnv(List envVars = [], def body) {
