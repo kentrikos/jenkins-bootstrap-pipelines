@@ -3,6 +3,15 @@
 pipeline {
 
     agent any
+
+    parameters {
+        choice(name: 'K8S_CLUSTER_NAME', 
+               arn:aws:eks:eu-west-1:111860764813:cluster/
+               choices: ["arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops", 
+                         "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"],
+               description: 'Choose target cluster name (required for kops)')
+    }
+
     stages {
         stage('Git local config') {
             steps {
