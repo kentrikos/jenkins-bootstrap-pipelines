@@ -1,0 +1,145 @@
+#!groovy
+
+import groovy.json.JsonOutput
+
+def ingValue = '''
+rbac:
+ create: true
+
+controller:
+ service:
+   annotations:
+     service.beta.kubernetes.io/aws-load-balancer-type: nlb
+     service.beta.kubernetes.io/aws-load-balancer-internal: true
+   enableHttp: true
+   enableHttps: false
+'''
+
+pipeline {
+
+    agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+
+    stages {
+        stage('Git local config') {
+            steps {
+                sh 'git config --global --add user.name "example"'
+                sh 'git config --global --add user.email "example@example.com"'
+            }
+        }
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+            }
+        }
+
+        stage('Get K8s cluster flavor') {
+            steps {
+                script {
+                    if (env.K8S_FLAVOR == "eks") {
+                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                    } else {
+                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                    println K8S_CLUSTER_NAME
+                }
+            }
+        }
+
+        stage('Switch kubectl context to ops') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    script {
+                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy K8s Ingress controller') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        writeFile file: 'ing-values.yaml', text: ingValue
+                        sh 'helm install --replace --wait --name opsing --namespace kube-system stable/nginx-ingress --set rbac.create=true --values ing-values.yaml'
+                    }
+                }
+            }
+        }
+
+        stage('Create wildcard DNS record') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def parameters = readYaml file: 'jenkins/parameters.yaml'
+
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
+
+                            println "Getting ingress NLB information"
+                            ingressNLBAddress = sh(script: "kubectl get service -n kube-system opsing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
+                                                   returnStdout: true).trim()
+                            ingressNLBHostedZoneID = sh(script: "aws --region \$AWS_REGION elbv2 describe-load-balancers --query 'LoadBalancers[?DNSName==`" + ingressNLBAddress + "`].CanonicalHostedZoneId' --output text",
+                                                   returnStdout: true).trim()
+
+                            println "Generating record for DNS update"
+                            def r53WildcardRecordJSON = """
+                            {
+                                "Comment": "Creating Alias resource record sets in Route 53",
+                                "Changes": [{
+                                    "Action": "UPSERT",
+                                    "ResourceRecordSet": {
+                                        "Name": "${r53WildcardRecordName}",
+                                        "Type": "A",
+                                        "AliasTarget": {
+                                            "HostedZoneId": "${ingressNLBHostedZoneID}",
+                                            "DNSName": "${ingressNLBAddress}",
+                                            "EvaluateTargetHealth": false
+                                        }
+                                    }
+                                }]
+                            }
+                            """
+                            writeFile file: 'opsing_r53_alias.json', text: r53WildcardRecordJSON
+                            sh "cat opsing_r53_alias.json"
+
+                            println "Creating/updating Route53 entry"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://opsing_r53_alias.json"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
+        script {
+            if (env.PROXY_HTTP) {
+                proxies << "http_proxy=$PROXY_HTTP"
+            }
+            if (env.PROXY_HTTPS) {
+                proxies << "https_proxy=$PROXY_HTTPS"
+            }
+            if (env.PROXY_NO) {
+                proxies << "no_proxy=$PROXY_NO"
+            }
+            envVaraibles.addAll(proxies)
+        }
+    }
+    envVaraibles.addAll(envVars)
+    withEnv(envVaraibles) {
+        body.call()
+    }
+}
