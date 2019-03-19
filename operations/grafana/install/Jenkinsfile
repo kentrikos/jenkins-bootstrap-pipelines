@@ -49,15 +49,17 @@ pipeline {
         stage('Check/create LMA namespace') {
             steps {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
-                    script {
-                        sh '''
-                        #!/bin/bash -x
-                        if ! kubectl get namespace lma;
-                        then 
-                            echo "Namespace for LMA does not exist, creating..."
-                            kubectl create namespace lma
-                        fi
-                        '''
+                    withProxyEnv() {
+                        script {
+                            sh '''
+                            #!/bin/bash -x
+                            if ! kubectl get namespace lma;
+                            then 
+                                echo "Namespace for LMA does not exist, creating..."
+                                kubectl create namespace lma
+                            fi
+                            '''
+                        }
                     }
                 }
             }
