@@ -50,9 +50,12 @@ pipeline {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
-                        script {
-                            sh 'helm delete --purge prometheus-app'
-                        }
+                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+
+                            script {
+                                sh 'helm delete --purge prometheus-app'
+
+                            }                        }
                     }
                 }
             }
