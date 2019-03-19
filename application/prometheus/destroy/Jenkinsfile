@@ -27,9 +27,9 @@ pipeline {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
-                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app"
+                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE"
                     } else {
-                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app.k8s.local"
+                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE.k8s.local"
                     }
                     println K8S_CLUSTER_NAME
                 }
