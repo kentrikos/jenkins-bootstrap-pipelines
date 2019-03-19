@@ -80,7 +80,7 @@ pipeline {
                                 sh """
                                 #!/bin/bash
                                 helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
-                                --set=server.service.type:LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal:0.0.0.0/0
+                                --set=server.service.type=LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal=0.0.0.0/0
                                 """
                             }
                         }
