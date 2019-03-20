@@ -14,7 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    application/$REGION/env -> application/$REGION/env-kops
                            -> application/$REGION/env-eks
    ```
-- Jobs for install kops and eks in seperte directories
+- Jobs for install kops and eks in separate directories
+
+### Added
+- Added jobs to destroy kops and eks on app account
+
 
 ## [0.3.0] - 2019-03-11
 - Added application/kubernetes/install_eks/Jenkinsfile (Jenkins Core pipeline)

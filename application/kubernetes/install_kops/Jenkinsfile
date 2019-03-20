@@ -1,166 +1,68 @@
+#!groovy
 pipeline {
-    agent { label 'jenkins-terraform' }
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
     environment {
         ENV_K8S_DIR = 'env-kops'
     }
+    agent any
     stages {
-        stage('install required software') {
-            steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sh '''#!/bin/bash -x
-                        whoami
-                        pwd
-                        pip install awscli --upgrade
-                        
-                        wget -O kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-                        chmod +x ./kops
-                        mv ./kops /usr/local/bin/
-                        
-                        yum --disableplugin=fastestmirror install -y jq
-                        
-                        ls -al /usr/local/bin
-                        terraform version
-                        aws --version
-                        kubectl --client=true version
-                        kops version
-                        jq --version
-                        
-                        pushd ${HOME}
-                        if [ ! -d .ssh ];
-                        then
-                            mkdir -p .ssh
-                            chmod 700 .ssh
-                        fi
-                        ls -al .ssh
-                        popd
-                        '''
-                    }
-                }
-            }
-        }
-        stage('check AWS identity') {
-            steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sh '''#!/bin/bash -x
-                        aws sts get-caller-identity
-                        '''
-                    }
-                }
-            }
-        }
-        
         stage('Git clone') {
             steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        cleanWs()
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            pwd
-                            git clone ${CONFIG_REPO_URL} .
-                            ls -al 
-                            '''
-                        }
-                    }
-                }
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
             }
         }
-
-        stage('TF init') {
+        stage('Init') {
             steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
-                            terraform init \
-                                -backend-config=\"region=${AWS_REGION}\" \
-                                -backend-config=\"bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
-                                -backend-config=\"key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate\" \
-                                -backend-config=\"dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}\" \
-                                -backend-config=\"role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount\"
-                            popd
-                            '''
+                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                    withProxyEnv() {
+                            sshagent(['bitbucket-key']) {
+                                sh '''#!/bin/bash -x
+                                terraform init -input=false \
+                                -backend-config="region=${AWS_REGION}" \
+                                -backend-config="bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate" \
+                                -backend-config="role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount"
+                                '''
                         }
                     }
                 }
             }
         }
-                            
-        stage('TF plan') {
+        stage('Plan') {
             steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
-
-                            terraform plan -out=tfplan -var-file="../terraform.tfvars" -input=false
-                            popd
-                            '''
+                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                                sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
                         }
                     }
                 }
             }
         }
-
-
-        stage('TF apply') {
-           input {
+        stage('Apply') {
+            input {
                 message "Should we continue?"
                 ok "Yes, we should."
             }
             steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            pushd application/${AWS_REGION}/${ENV_K8S_DIR}
-
-                            # CREATE:
-                            terraform apply -input=false tfplan
-                            
-                            popd
-                            '''
+                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                                sh '/usr/bin/terraform apply -input=false tfplan'
                         }
-                    }
-                }
-            }
-        }
-        
-
-        stage('Collect artifacts') {
-            steps {
-                container('terraform') {
-                    withCustomEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            mkdir -p outputs
-                            pushd outputs
-                            cp -r /home/jenkins/.ssh/ ./
-                            mkdir .kube
-                            cp /home/jenkins/.kube/config ./kube/
-                            popd
-                            ls -al outputs
-                            #FIXME: consider generating kops state from s3 bucket and storying K8s instances ssh key in SSM to make artifacts immutable
-                            '''
-                        }
-                        archiveArtifacts artifacts: 'outputs/**'
                     }
                 }
             }
         }
     }
 }
-
-
-void withCustomEnv(List envVars = [],  def body) {
-    List proxies =[]
-    List envVariables = [
-        'GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no'
-    ]
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
     withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
         script {
             if (env.PROXY_HTTP) {
@@ -172,12 +74,12 @@ void withCustomEnv(List envVars = [],  def body) {
             if (env.PROXY_NO) {
                 proxies << "no_proxy=$PROXY_NO"
             }
-            envVariables.addAll(proxies)
+            envVaraibles.addAll(proxies)
         }
     }
-    envVariables.addAll(envVars)
+    envVaraibles.addAll(envVars)
 
-    withEnv(envVariables) {
+    withEnv(envVaraibles) {
         body.call()
     }
 }

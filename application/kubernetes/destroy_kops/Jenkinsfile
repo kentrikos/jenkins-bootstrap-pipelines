@@ -2,7 +2,7 @@
 pipeline {
     agent any
     environment {
-        ENV_K8S_DIR = 'env-eks'
+        ENV_K8S_DIR = 'env-kops'
     }
     stages {
         stage('Git clone') {
@@ -18,10 +18,12 @@ pipeline {
                         sshagent(['bitbucket-key']) {
                             sh '''#!/bin/bash -x
                             terraform init -input=false \
-                            -backend-config="region=${AWS_REGION}" \
-                            -backend-config="bucket=tf-${AWS_OPERATIONS_ACCOUNT_NUMBER}-ops-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
+                                terraform init -input=false \
+                                -backend-config="region=${AWS_REGION}" \
+                                -backend-config="bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate" \
+                                -backend-config="role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount"
                             '''
                         }
                     }
@@ -49,6 +51,28 @@ pipeline {
                     ansiColor('xterm') {
                         withProxyEnv() {
                             sh '/usr/bin/terraform apply -input=false tfplandestroy'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Kops check') {
+            steps {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            sh '''#!/bin/bash -x
+                            K8S_CLUSTER_NAME="${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}.k8s.local"
+                            KOPS_STATE_BUCKET="kops-${AWS_APPLICATION_ACCOUNT_NUMBER}-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}"
+                            if kops --state s3://${KOPS_STATE_BUCKET} get cluster ${K8S_CLUSTER_NAME};
+                            then
+                              echo "Seems that Terraform has not destroyed the cluster, perhaps it was not fully deployed and marked as tainted resource."
+                              echo "Deleting directly with kops..."
+                              kops --state s3://${KOPS_STATE_BUCKET} delete cluster ${K8S_CLUSTER_NAME} --yes
+                            else
+                              echo "Looks like the cluster has beed finally destroyed."
+                            fi
+                            '''
                         }
                     }
                 }

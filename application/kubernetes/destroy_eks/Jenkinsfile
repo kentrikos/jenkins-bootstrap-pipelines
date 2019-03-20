@@ -15,14 +15,16 @@ pipeline {
             steps {
                 dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     withProxyEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            terraform init -input=false \
-                            -backend-config="region=${AWS_REGION}" \
-                            -backend-config="bucket=tf-${AWS_OPERATIONS_ACCOUNT_NUMBER}-ops-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
-                            '''
+                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                            sshagent(['bitbucket-key']) {
+                                sh '''#!/bin/bash -x
+                                terraform init -input=false \
+                                -backend-config="region=${AWS_REGION}" \
+                                -backend-config="bucket=tf-${AWS_OPERATIONS_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
+                                '''
+                            }
                         }
                     }
                 }
@@ -33,7 +35,9 @@ pipeline {
                 dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform plan -destroy -var-file="../terraform.tfvars" -out=tfplandestroy -input=false'
+                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                                sh '/usr/bin/terraform plan -destroy -var-file="../terraform.tfvars" -out=tfplandestroy -input=false'
+                            }
                         }
                     }
                 }
@@ -48,7 +52,9 @@ pipeline {
                 dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            sh '/usr/bin/terraform apply -input=false tfplandestroy'
+                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                                sh '/usr/bin/terraform apply -input=false tfplandestroy'
+                            }
                         }
                     }
                 }
