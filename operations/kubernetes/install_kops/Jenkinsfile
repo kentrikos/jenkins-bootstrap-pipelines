@@ -1,0 +1,84 @@
+#!groovy
+pipeline {
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
+    environment {
+        ENV_K8S_DIR = 'env-kops'
+    }
+    agent any
+    stages {
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+            }
+        }
+        stage('Init') {
+            steps {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
+                    withProxyEnv() {
+                        sshagent(['bitbucket-key']) {
+                            sh '''#!/bin/bash -x
+                            terraform init -input=false \
+                            -backend-config="region=${AWS_REGION}" \
+                            -backend-config="bucket=tf-${AWS_OPERATIONS_ACCOUNT_NUMBER}-ops-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                            -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
+                            -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        stage('Plan') {
+            steps {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            sh '/usr/bin/terraform apply -input=false tfplan'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+void withProxyEnv(List envVars = [], def body) {
+    List proxies = []
+    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
+    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
+        script {
+            if (env.PROXY_HTTP) {
+                proxies << "http_proxy=$PROXY_HTTP"
+            }
+            if (env.PROXY_HTTPs) {
+                proxies << "https_proxy=$PROXY_HTTPS"
+            }
+            if (env.PROXY_NO) {
+                proxies << "no_proxy=$PROXY_NO"
+            }
+            envVaraibles.addAll(proxies)
+        }
+    }
+    envVaraibles.addAll(envVars)
+
+    withEnv(envVaraibles) {
+        body.call()
+    }
+}

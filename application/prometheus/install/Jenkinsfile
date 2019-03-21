@@ -27,9 +27,9 @@ pipeline {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
-                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app"
+                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE"
                     } else {
-                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-app.k8s.local"
+                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE.k8s.local"
                     }
                     println K8S_CLUSTER_NAME
                 }
@@ -49,15 +49,19 @@ pipeline {
         stage('Check/create LMA namespace') {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
-                    script {
-                        sh '''
-                        #!/bin/bash -x
-                        if ! kubectl get namespace lma;
-                        then 
-                            echo "Namespace for LMA does not exist, creating..."
-                            kubectl create namespace lma
-                        fi
-                        '''
+                    withProxyEnv() {
+                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                            script {
+                                sh '''
+                                #!/bin/bash -x
+                                if ! kubectl get namespace lma;
+                                then 
+                                    echo "Namespace for LMA does not exist, creating..."
+                                    kubectl create namespace lma
+                                fi
+                                '''
+                            }
+                        }
                     }
                 }
             }
@@ -67,15 +71,18 @@ pipeline {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
-                        script {
-                            /*
+                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+
+                            script {
+                                /*
                              * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
                              */
-                            sh """
-                            #!/bin/bash
-                            helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
-                            --set=server.service.type:LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal:0.0.0.0/0
-                            """
+                                sh """
+                                #!/bin/bash
+                                helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
+                                --set=server.service.type=LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal=0.0.0.0/0
+                                """
+                            }
                         }
                     }
                 }

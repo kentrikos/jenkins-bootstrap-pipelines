@@ -1,12 +1,9 @@
 #!groovy
 pipeline {
-    options {
-        timeout(time: 60, unit: 'MINUTES')
-    }
-    environment {
-        ENV_K8S_DIR = 'env-eks'
-    }
     agent any
+    environment {
+        ENV_K8S_DIR = 'env-kops'
+    }
     stages {
         stage('Git clone') {
             steps {
@@ -16,18 +13,18 @@ pipeline {
         }
         stage('Init') {
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     withProxyEnv() {
-                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                            sshagent(['bitbucket-key']) {
-                                sh '''#!/bin/bash -x
+                        sshagent(['bitbucket-key']) {
+                            sh '''#!/bin/bash -x
+                            terraform init -input=false \
                                 terraform init -input=false \
                                 -backend-config="region=${AWS_REGION}" \
                                 -backend-config="bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
                                 -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
-                                '''
-                            }
+                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate" \
+                                -backend-config="role_arn=arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:role/KENTRIKOS_${AWS_REGION}_${PRODUCT_DOMAIN_NAME}_${ENVIRONMENT_TYPE}_CrossAccount"
+                            '''
                         }
                     }
                 }
@@ -35,12 +32,10 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                                sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
-                            }
+                            sh '/usr/bin/terraform plan -destroy -var-file="../terraform.tfvars" -out=tfplandestroy -input=false'
                         }
                     }
                 }
@@ -52,29 +47,37 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
-                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                                sh '/usr/bin/terraform apply -input=false tfplan'
-                            }
+                            sh '/usr/bin/terraform apply -input=false tfplandestroy'
                         }
                     }
                 }
             }
         }
-        stage('Retrieve kubeconfig') {
+        stage('Kops check') {
             steps {
-                withProxyEnv() {
-                    withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                        sh '''#!/bin/bash -x
-                       aws eks update-kubeconfig --name ${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE} --region ${AWS_REGION}
-                       '''
+                dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
+                    ansiColor('xterm') {
+                        withProxyEnv() {
+                            sh '''#!/bin/bash -x
+                            K8S_CLUSTER_NAME="${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}.k8s.local"
+                            KOPS_STATE_BUCKET="kops-${AWS_APPLICATION_ACCOUNT_NUMBER}-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}"
+                            if kops --state s3://${KOPS_STATE_BUCKET} get cluster ${K8S_CLUSTER_NAME};
+                            then
+                              echo "Seems that Terraform has not destroyed the cluster, perhaps it was not fully deployed and marked as tainted resource."
+                              echo "Deleting directly with kops..."
+                              kops --state s3://${KOPS_STATE_BUCKET} delete cluster ${K8S_CLUSTER_NAME} --yes
+                            else
+                              echo "Looks like the cluster has beed finally destroyed."
+                            fi
+                            '''
+                        }
                     }
                 }
             }
         }
-
     }
 }
 void withProxyEnv(List envVars = [], def body) {
