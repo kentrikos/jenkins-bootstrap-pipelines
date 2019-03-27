@@ -11,7 +11,9 @@ pipeline {
     agent any
     stages {
         stage('Git clone') {
-            gitCloneConfigRepo
+            steps {
+                gitCloneConfigRepo
+            }
         }
         stage('Init') {
             steps {
@@ -31,10 +33,18 @@ pipeline {
             }
         }
         stage('Plan') {
-            terraformPlan dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+            steps {
+                terraformPlan dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+            }
         }
         stage('Apply') {
-            terraformApply dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+            }
         }
         stage('Retrieve kubeconfig') {
             steps {
