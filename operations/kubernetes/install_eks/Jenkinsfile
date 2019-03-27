@@ -10,9 +10,9 @@ pipeline {
     }
     agent any
     stages {
-
-        gitCloneConfigRepo
-
+        stage('Git clone') {
+            gitCloneConfigRepo
+        }
         stage('Init') {
             steps {
                 dir("operations/$AWS_REGION/$ENV_K8S_DIR") {
@@ -30,11 +30,12 @@ pipeline {
                 }
             }
         }
-
-        terraformPlan dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
-        terraformApply dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
-
-
+        stage('Plan') {
+            terraformPlan dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+        }
+        stage('Apply') {
+            terraformApply dir: "operations/$AWS_REGION/$ENV_K8S_DIR"
+        }
         stage('Retrieve kubeconfig') {
             steps {
                 withProxyEnv() {
