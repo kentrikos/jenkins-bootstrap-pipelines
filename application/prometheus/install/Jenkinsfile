@@ -1,5 +1,15 @@
 #!groovy
 
+
+def prometheusValues = '''
+server:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-internal: 'true'
+'''
+
+
 pipeline {
 
     agent any
@@ -71,16 +81,13 @@ pipeline {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
+                        writeFile file: 'prometheus-values.yaml', text: prometheusValues
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                             script {
                                 /*
                                  * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
                                  */
-                                sh """
-                                #!/bin/bash
-                                helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
-                                --set=server.service.type=LoadBalancer,server.service.annotations=service.beta.kubernetes.io/aws-load-balancer-internal:0.0.0.0/0
-                                """
+                                sh "helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus --values prometheus-values.yaml"
                             }
                         }
                     }
