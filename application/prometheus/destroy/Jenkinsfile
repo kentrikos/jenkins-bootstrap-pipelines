@@ -59,6 +59,38 @@ pipeline {
                 }
             }
         }
+
+        stage('Read Grafana endpoint') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
+                            def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
+
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            grafanaEndpoint = "grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            grafanaAdminPassword = grafanaParameters.defaultAdminPassword
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Destroy Prometheus_app endpoint in Grafana') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def prometheusDataSourceName = "Prometheus_app"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/datasources/name/${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
