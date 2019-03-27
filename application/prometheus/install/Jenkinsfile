@@ -119,7 +119,7 @@ pipeline {
             }
         }
 
-        stage('Add Prometheus/operations data-source to Grafana') {
+        stage('Add Prometheus/application data-source to Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
