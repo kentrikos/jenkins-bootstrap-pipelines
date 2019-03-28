@@ -6,11 +6,11 @@ pipeline {
 
     parameters {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
-               description: 'Choose type of Kubernetes cluster (required for kops)')
+               description: 'Choose type of Kubernetes cluster (required for kops)'),
         string(name: 'GRAFANA_DASHBOARD_URL', defaultValue: 'https://grafana.com/api/dashboards/6417/revisions/1/download',
-               description: 'URL for downloading json file for Grafana dashboard')
+               description: 'URL for downloading json file for Grafana dashboard'),
         string(name: 'GRAFANA_DASHBOARD_UID', defaultValue: '6417ops',
-               description: 'New, unique UID for the dashboard')
+               description: 'New, unique UID for the dashboard'),
         string(name: 'GRAFANA_DASHBOARD_TITLE', defaultValue: 'Kubernetes Cluster/ops',
                description: 'Title for the new dashboard')
     }
