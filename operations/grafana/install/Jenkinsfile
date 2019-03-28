@@ -81,7 +81,8 @@ pipeline {
                             sh """
                             #!/bin/bash
                             helm install --replace --wait --name grafana --namespace lma stable/grafana \
-                            --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword
+                            --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword \
+                            --set=persistence.enabled=true
                             """
                         }
                     }
