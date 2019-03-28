@@ -79,7 +79,7 @@ pipeline {
             }
         }
 
-        stage('Destroy Prometheus_app endpoint in Grafana') {
+        stage('Destroy Prometheus_app data-source in Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
