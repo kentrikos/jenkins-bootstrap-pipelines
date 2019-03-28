@@ -4,24 +4,20 @@ import groovy.json.JsonOutput
 
 library 'kentrikos-shared-library'
 pipeline {
-
+    environment {
+        ENV_K8S_DIR = 'env-kops'
+        OPERTION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
+    }
     agent any
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
         stage('Remove wildcard DNS record') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         script {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
@@ -67,7 +63,7 @@ pipeline {
         }
         stage('Remove jx') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("$OPERTION_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
                             script {
@@ -80,7 +76,7 @@ pipeline {
         }
         stage('Remove k8s ingress') {
             steps {
-                dir("operations/$AWS_REGION/env") {
+                dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         sh 'helm delete  jxing'
                     }

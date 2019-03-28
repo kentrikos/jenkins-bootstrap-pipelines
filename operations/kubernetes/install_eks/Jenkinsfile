@@ -19,7 +19,6 @@ pipeline {
         stage('Init') {
             steps {
                 terraformInitOperations dir: "$OPERTION_DIR", subcomponent: "${ENV_K8S_DIR}"
-
             }
         }
         stage('Plan') {

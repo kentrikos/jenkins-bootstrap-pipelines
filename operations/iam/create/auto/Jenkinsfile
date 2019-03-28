@@ -1,42 +1,25 @@
 #!groovy
 library 'kentrikos-shared-library'
 pipeline {
-
+    environment {
+        OPERTION_DIR = "operations/$AWS_REGION/iam"
+        SUBCOMPONENT = "iam"
+    }
     agent any
     stages {
-
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
         stage('Init') {
             steps {
-                dir("operations/$AWS_REGION/iam") {
-                    withProxyEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '''#!/bin/bash -x
-                            terraform init -input=false \
-                            -backend-config="region=${AWS_REGION}" \
-                            -backend-config="bucket=tf-${AWS_OPERATIONS_ACCOUNT_NUMBER}-ops-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                            -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/iam/terraform.tfstate"
-                            '''
-                        }
-                    }
-                }
+                terraformInitOperations dir: "$OPERTION_DIR", subcomponent: "$SUBCOMPONENT"
             }
         }
         stage('Plan') {
             steps {
-                dir("operations/$AWS_REGION/iam") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
-                        }
-                    }
-                }
+                terraformPlan dir: "$OPERTION_DIR"
             }
         }
         stage('Apply') {
@@ -45,14 +28,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("operations/$AWS_REGION/iam") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            sh '/usr/bin/terraform apply -input=false tfplan'
-                        }
-                    }
-                    archiveArtifacts artifacts: 'outputs/**'
-                }
+                terraformApply dir: "$OPERTION_DIR"
             }
         }
     }

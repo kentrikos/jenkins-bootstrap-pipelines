@@ -1,3 +1,5 @@
+#!groovy
+
 def call(Map config) {
 
     dir("${config.dir}") {
@@ -6,5 +8,6 @@ def call(Map config) {
                 sh '/usr/bin/terraform apply -input=false tfplan'
             }
         }
+        archiveArtifacts artifacts: 'outputs/**', allowEmptyArchive: true
     }
 }

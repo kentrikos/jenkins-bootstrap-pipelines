@@ -1,3 +1,5 @@
+#!groovy
+
 def call(Map config) {
 
     dir("${config.dir}") {

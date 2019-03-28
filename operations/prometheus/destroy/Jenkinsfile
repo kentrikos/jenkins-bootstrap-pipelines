@@ -9,18 +9,13 @@ pipeline {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
                description: 'Choose type of Kubernetes cluster (required for kops)')
     }
-
+    environment {
+        OPERTION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
+    }
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
 
@@ -39,7 +34,7 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_DIR") {
                     script {
                       sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
@@ -49,7 +44,7 @@ pipeline {
 
         stage('Destroy Prometheus/operations') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         script {
                             sh 'helm delete --purge prometheus-ops'
@@ -60,7 +55,7 @@ pipeline {
         }
         stage('Read Grafana endpoint') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -78,7 +73,7 @@ pipeline {
         }
         stage('Destroy Prometheus_ops endpoint in Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
