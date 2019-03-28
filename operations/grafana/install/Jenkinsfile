@@ -7,6 +7,8 @@ pipeline {
     parameters {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
                description: 'Choose type of Kubernetes cluster (required for kops)')
+        string(name: 'GRAFANA_PVC', defaultValue: "",
+               description: 'Name of existing PVC to use for Grafana storage (e.g. "grafana")')
     }
 
     stages {
@@ -82,7 +84,7 @@ pipeline {
                             #!/bin/bash
                             helm install --replace --wait --name grafana --namespace lma stable/grafana \
                             --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword \
-                            --set=persistence.enabled=true
+                            --set=persistence.enabled=true,persistence.existingClaim=$GRAFANA_PVC
                             """
                         }
                     }
