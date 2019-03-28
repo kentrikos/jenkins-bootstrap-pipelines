@@ -71,13 +71,26 @@ pipeline {
                 }
             }
         }
-        stage('Destroy Prometheus_ops endpoint in Grafana') {
+        stage('Destroy Prometheus_ops data-source in Grafana') {
             steps {
                 dir("$OPERTION_DIR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
                             sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/datasources/name/${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Delete Prometheus/ops dashboard from Grafana') {
+            steps {
+                dir("$OPERTION_DIR") {
+                    withProxyEnv() {
+                        script {
+                            def grafanaDashboardUID = "kcops"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/dashboards/uid/${grafanaDashboardUID} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
                         }
                     }
                 }

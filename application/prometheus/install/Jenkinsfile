@@ -1,6 +1,15 @@
 #!groovy
 
 library 'kentrikos-shared-library'
+
+def prometheusValues = '''
+server:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-internal: 'true'
+'''
+
 pipeline {
 
     agent any
@@ -68,22 +77,94 @@ pipeline {
             }
         }
 
-        stage('Deploy Prometheus/application') {
+       stage('Deploy Prometheus/app') {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
+                        writeFile file: 'prometheus-values.yaml', text: prometheusValues
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-
                             script {
                                 /*
-                             * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
-                             */
-                                sh """
-                                #!/bin/bash
-                                helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus \
-                                --set=server.service.type=LoadBalancer,annotations:service.beta.kubernetes.io/aws-load-balancer-internal=0.0.0.0/0
-                                """
+                                 * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
+                                 */
+                                sh "helm install --replace --wait --name prometheus-app --namespace lma stable/prometheus --values prometheus-values.yaml"
                             }
+                        }
+                    }
+                }
+            }
+       }
+
+       stage('Read DNS information') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
+
+                            println "Getting domain name for Grafana"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            grafanaEndpoint = "grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                        }
+                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
+                            script {
+                                println "Getting ELB DNS name for Prometheus"
+                                prometheusEndpoint = sh(script: "kubectl -n lma get service prometheus-app-server -o json | jq -r '.status.loadBalancer.ingress[].hostname'",
+                                                        returnStdout: true).trim().replaceAll("\\.\$", "")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Add Prometheus/app data-source to Grafana') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
+                            def grafanaAdminPassword = grafanaParameters.defaultAdminPassword
+                            def requestJson = """
+                            {
+                              "name": "Prometheus_app",
+                              "isDefault": false,
+                              "type": "prometheus",
+                              "url": "http://${prometheusEndpoint}",
+                              "access": "proxy",
+                              "basicAuth": true,
+                              "basicAuthUser": "admin",
+                              "basicAuthPassword": "admin"
+                            }
+                            """
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/datasources -X POST -H 'Content-Type: application/json;charset=UTF-8' --data-binary '${requestJson}'"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Add Prometheus/app dashboard to Grafana') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
+                            def grafanaAdminPassword = grafanaParameters.defaultAdminPassword
+                            println "Downloading and adjusting dashboard:"
+                            sh "curl https://grafana.com/api/dashboards/6417/revisions/1/download -o grafana_dashboard_kubernetes_cluster.json"
+                            dashboardJSON =  sh(script: 'jq --arg id 0 --arg uid kcapp --arg title "Kubernetes Cluster/app" ".id=\\\$uid | .uid=\\\$uid | .title=\\\$title" grafana_dashboard_kubernetes_cluster.json | sed -e "s/\\\${DS_PROMETHEUS}/Prometheus_app/g"',
+                                                returnStdout: true).trim().replaceAll("\\.\$", "")
+                            println "Creating dashboard:"
+                            def requestJson = """
+                            {
+                                "folderId": 0,
+                                "overwrite": false,
+                                "dashboard": $dashboardJSON
+                            }
+                            """
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/dashboards/db -X POST -H 'Content-Type: application/json;charset=UTF-8' --data-binary '${requestJson}'"
                         }
                     }
                 }
