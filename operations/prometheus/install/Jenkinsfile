@@ -121,7 +121,7 @@ pipeline {
                             def grafanaAdminPassword = grafanaParameters.defaultAdminPassword
                             println "Downloading and adjusting dashboard:"
                             sh "curl $GRAFANA_DASHBOARD_URL -o grafana_dashboard.json"
-                            dashboardJSON =  sh(script: 'jq --arg id 0 --arg uid $GRAFANA_DASHBOARD_UID --arg title $GRAFANA_DASHBOARD_TITLE ".id=\\\$uid | .uid=\\\$uid | .title=\\\$title" grafana_dashboard.json | sed -e "s/\\\${DS_PROMETHEUS}/Prometheus_ops/g"',
+                            dashboardJSON =  sh(script: 'jq --arg id 0 --arg uid $GRAFANA_DASHBOARD_UID --arg title $GRAFANA_DASHBOARD_TITLE ".id=\\\$id | .uid=\\\$uid | .title=\\\$title" grafana_dashboard.json | sed -e "s/\\\${DS_PROMETHEUS}/Prometheus_ops/g"',
                                                 returnStdout: true).trim().replaceAll("\\.\$", "")
                             println "Creating dashboard:"
                             def requestJson = """
