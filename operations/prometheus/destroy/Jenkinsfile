@@ -87,6 +87,19 @@ pipeline {
                 }
             }
         }
+
+        stage('Delete Prometheus/ops dashboard from Grafana') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def grafanaDashboardUID = "kcops"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/dashboards/uid/${grafanaDashboardUID} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

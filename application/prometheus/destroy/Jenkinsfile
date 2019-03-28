@@ -92,7 +92,7 @@ pipeline {
             }
         }
 
-        stage('Delete Prometheus_app dashboard from Grafana') {
+        stage('Delete Prometheus/app dashboard from Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {

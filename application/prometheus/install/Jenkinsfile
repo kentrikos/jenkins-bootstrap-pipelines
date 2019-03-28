@@ -145,7 +145,7 @@ pipeline {
             }
         }
 
-        stage('Add Prometheus/app dashboard do Grafana') {
+        stage('Add Prometheus/app dashboard to Grafana') {
             steps {
                 dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
