@@ -46,7 +46,7 @@ pipeline {
             }
         }
 
-        stage('Destroy Prometheus/application') {
+        stage('Destroy Prometheus/app') {
             steps {
                 dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
                     withProxyEnv() {
@@ -86,6 +86,19 @@ pipeline {
                         script {
                             def prometheusDataSourceName = "Prometheus_app"
                             sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/datasources/name/${prometheusDataSourceName} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Delete Prometheus_app dashboard from Grafana') {
+            steps {
+                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                    withProxyEnv() {
+                        script {
+                            def grafanaDashboardUID = "kcapp"
+                            sh "curl --verbose --user admin:${grafanaAdminPassword} http://${grafanaEndpoint}/api/dashboards/uid/${grafanaDashboardUID} -X DELETE -H 'Content-Type: application/json;charset=UTF-8'"
                         }
                     }
                 }
