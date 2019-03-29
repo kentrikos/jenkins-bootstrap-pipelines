@@ -1,6 +1,12 @@
 #!groovy
 
+
 def grafanaPVCName = ""
+def grafanaPVPatch = '''
+spec:
+    claimRef:
+        uid:
+'''
 
 pipeline {
 
@@ -106,16 +112,10 @@ pipeline {
                                   storageClassName: gp2
                                   volumeName: $GRAFANA_PV
                                 """
-                                def grafanaPVPatch = '''
-spec:
-    claimRef:
-        uid:
-                                '''
                                 writeFile file: 'grafana-pvc.yaml', text: grafanaPVC
                                 sh "kubectl -n lma delete pvc grafana || true"
                                 sh "kubectl patch pv $GRAFANA_PV --patch '$grafanaPVPatch'"
                                 sh "kubectl -n lma create -f grafana-pvc.yaml"
-                                
                             } else {
                                 grafanaPVCName = ""
                             }
