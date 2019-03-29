@@ -1,5 +1,13 @@
 #!groovy
 
+
+def grafanaPVCName = ""
+def grafanaPVPatch = '''
+spec:
+    claimRef:
+        uid:
+'''
+
 pipeline {
 
     agent any
@@ -7,6 +15,8 @@ pipeline {
     parameters {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
                description: 'Choose type of Kubernetes cluster (required for kops)')
+        string(name: 'GRAFANA_PV', defaultValue: "",
+               description: 'Name of existing PV to use for Grafana storage (usually "pvc-*"), leave empty if this is first deployment')
     }
 
     stages {
@@ -78,10 +88,43 @@ pipeline {
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
                             def grafana_address = "grafana." + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
 
+                            if (GRAFANA_PV) {
+                                println "Restoring from existing PersistentVolume :"
+                                grafanaPVCName = "grafana"
+                                def grafanaPVC = """
+                                apiVersion: v1
+                                kind: PersistentVolumeClaim
+                                metadata:
+                                  annotations:
+                                    volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/aws-ebs
+                                  finalizers:
+                                  - kubernetes.io/pvc-protection
+                                  labels:
+                                    app: grafana
+                                  name: grafana
+                                  namespace: lma
+                                spec:
+                                  accessModes:
+                                  - ReadWriteOnce
+                                  resources:
+                                    requests:
+                                      storage: 10Gi
+                                  storageClassName: gp2
+                                  volumeName: $GRAFANA_PV
+                                """
+                                writeFile file: 'grafana-pvc.yaml', text: grafanaPVC
+                                sh "kubectl -n lma delete pvc grafana || true"
+                                sh "kubectl patch pv $GRAFANA_PV --patch '$grafanaPVPatch'"
+                                sh "kubectl -n lma create -f grafana-pvc.yaml"
+                            } else {
+                                grafanaPVCName = ""
+                            }
+                            
                             sh """
                             #!/bin/bash
                             helm install --replace --wait --name grafana --namespace lma stable/grafana \
-                            --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword
+                            --set=ingress.enabled=true,ingress.hosts={$grafana_address},adminPassword=$grafana_parameters.defaultAdminPassword \
+                            --set=persistence.enabled=true,persistence.existingClaim=$grafanaPVCName
                             """
                         }
                     }
