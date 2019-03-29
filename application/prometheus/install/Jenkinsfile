@@ -19,8 +19,8 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERTION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
-        OPERTION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
 
     }
     stages {
@@ -45,7 +45,7 @@ pipeline {
 
         stage('Switch kubectl context to app') {
             steps {
-                dir("$OPERTION_APP_DIR") {
+                dir("$OPERATION_APP_DIR") {
                     script {
                         sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
@@ -55,7 +55,7 @@ pipeline {
 
         stage('Check/create LMA namespace') {
             steps {
-                dir("$OPERTION_APP_DIR") {
+                dir("$OPERATION_APP_DIR") {
                     withProxyEnv() {
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                             script {
@@ -76,7 +76,7 @@ pipeline {
 
        stage('Deploy Prometheus/app') {
             steps {
-                dir("$OPERTION_APP_DIR") {
+                dir("$OPERATION_APP_DIR") {
                     withProxyEnv() {
                         writeFile file: 'prometheus-values.yaml', text: prometheusValues
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
@@ -94,7 +94,7 @@ pipeline {
 
        stage('Read DNS information') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -118,7 +118,7 @@ pipeline {
 
         stage('Add Prometheus/app data-source to Grafana') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
@@ -144,7 +144,7 @@ pipeline {
 
         stage('Add Prometheus/app dashboard to Grafana') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'

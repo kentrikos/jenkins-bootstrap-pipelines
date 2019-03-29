@@ -8,7 +8,7 @@ pipeline {
     }
     environment {
         ENV_K8S_DIR = 'env-kops'
-        OPERTION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
+        OPERATION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
     }
     agent any
     stages {
@@ -19,12 +19,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitOperations dir: "$OPERTION_DIR", subcomponent: "${ENV_K8S_DIR}"
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "${ENV_K8S_DIR}"
             }
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERTION_DIR"
+                terraformPlan dir: "$OPERATION_DIR"
             }
         }
         stage('Apply') {
@@ -33,7 +33,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApply dir: "$OPERTION_DIR"
+                terraformApply dir: "$OPERATION_DIR"
             }
         }
     }

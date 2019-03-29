@@ -10,7 +10,7 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERTION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
     }
     stages {
         stage('Git clone') {
@@ -34,7 +34,7 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     script {
                         sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
@@ -44,7 +44,7 @@ pipeline {
 
         stage('Read DNS domain') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -62,7 +62,7 @@ pipeline {
 
         stage('Deploy Prometheus/ops') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             sh """
@@ -78,7 +78,7 @@ pipeline {
  
         stage('Add Prometheus/ops data-source to Grafana') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
@@ -104,7 +104,7 @@ pipeline {
 
         stage('Add Prometheus/ops dashboard to Grafana') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'

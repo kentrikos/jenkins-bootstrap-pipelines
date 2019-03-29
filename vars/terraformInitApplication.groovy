@@ -1,7 +1,7 @@
 #!groovy
 
 def call(Map config) {
-    if (config.withAws) {
+    if (config.withAWS) {
         dir("${config.dir}") {
             withProxyEnv() {
                 withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {

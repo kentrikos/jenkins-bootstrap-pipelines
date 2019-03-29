@@ -11,8 +11,8 @@ pipeline {
     }
 
     environment {
-        OPERTION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
-        OPERTION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
 
     }
     stages {
@@ -47,7 +47,7 @@ pipeline {
 
         stage('Destroy Prometheus/app') {
             steps {
-                dir("$OPERTION_APP_DIR") {
+                dir("$OPERATION_APP_DIR") {
                     withProxyEnv() {
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                             script {
@@ -61,7 +61,7 @@ pipeline {
 
         stage('Read Grafana endpoint') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -80,7 +80,7 @@ pipeline {
 
         stage('Destroy Prometheus_app data-source in Grafana') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_app"
@@ -93,7 +93,7 @@ pipeline {
 
         stage('Delete Prometheus/app dashboard from Grafana') {
             steps {
-                dir("$OPERTION_OPS_DIR") {
+                dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaDashboardUID = "kcapp"

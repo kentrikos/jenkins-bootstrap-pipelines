@@ -64,7 +64,7 @@ def jxValueMap = [
 pipeline {
     environment {
         ENV_K8S_DIR = 'env-kops'
-        OPERTION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
+        OPERATION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
     }
     agent any
     stages {
@@ -75,7 +75,7 @@ pipeline {
         }
         stage('Init helm') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         writeFile file: 'helm-rbac-config.yaml', text: helmRbacConfig
                         sh 'kubectl create -f helm-rbac-config.yaml ||true'
@@ -86,7 +86,7 @@ pipeline {
         }
         stage('Init k8s ingress') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         writeFile file: 'ing-values.yaml', text: ingValue
                         sh 'helm install --replace --wait --name jxing --namespace kube-system stable/nginx-ingress --set rbac.create=true --values ing-values.yaml||true'
@@ -96,7 +96,7 @@ pipeline {
         }
         stage('Create wildcard DNS record') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
@@ -142,7 +142,7 @@ pipeline {
         }
         stage('Install jx on k8s') {
             steps {
-                dir("$OPERTION_DIR") {
+                dir("$OPERATION_DIR") {
                     ansiColor('xterm') {
                         withProxyEnv() {
                             script {

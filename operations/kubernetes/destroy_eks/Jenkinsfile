@@ -5,7 +5,7 @@ pipeline {
     agent any
     environment {
         ENV_K8S_DIR = 'env-eks'
-        OPERTION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
+        OPERATION_DIR = "operations/$AWS_REGION/$ENV_K8S_DIR"
     }
     stages {
         stage('Git clone') {
@@ -15,12 +15,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitOperations dir: "$OPERTION_DIR", subcomponent: "${ENV_K8S_DIR}"
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "${ENV_K8S_DIR}"
             }
         }
         stage('Plan') {
             steps {
-                terraformPlanDestroy dir: "$OPERTION_DIR"
+                terraformPlanDestroy dir: "$OPERATION_DIR"
             }
         }
         stage('Apply') {
@@ -29,7 +29,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApplyDestroy dir: "$OPERTION_DIR"
+                terraformApplyDestroy dir: "$OPERATION_DIR"
             }
         }
     }

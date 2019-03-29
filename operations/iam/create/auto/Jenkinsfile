@@ -2,7 +2,7 @@
 library 'kentrikos-shared-library'
 pipeline {
     environment {
-        OPERTION_DIR = "operations/$AWS_REGION/iam"
+        OPERATION_DIR = "operations/$AWS_REGION/iam"
         SUBCOMPONENT = "iam"
     }
     agent any
@@ -14,12 +14,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitOperations dir: "$OPERTION_DIR", subcomponent: "$SUBCOMPONENT"
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUBCOMPONENT"
             }
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERTION_DIR"
+                terraformPlan dir: "$OPERATION_DIR"
             }
         }
         stage('Apply') {
@@ -28,7 +28,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApply dir: "$OPERTION_DIR"
+                terraformApply dir: "$OPERATION_DIR"
             }
         }
     }

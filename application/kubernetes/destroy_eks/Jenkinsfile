@@ -5,7 +5,7 @@ pipeline {
     agent any
     environment {
         ENV_K8S_DIR = 'env-eks'
-        OPERTION_DIR = "application/$AWS_REGION/$ENV_K8S_DIR"
+        OPERATION_DIR = "application/$AWS_REGION/$ENV_K8S_DIR"
     }
     agent any
     stages {
@@ -16,12 +16,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitApplication dir: "$OPERTION_DIR", subcomponent: "${ENV_K8S_DIR}", withAWS: true
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "${ENV_K8S_DIR}", withAWS: true
             }
         }
         stage('Plan') {
             steps {
-                terraformPlanDestroy dir: "$OPERTION_DIR", withAWS: true
+                terraformPlanDestroy dir: "$OPERATION_DIR", withAWS: true
             }
         }
         stage('Apply') {
@@ -30,7 +30,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApplyDestroy dir: "$OPERTION_DIR", withAWS: true
+                terraformApplyDestroy dir: "$OPERATION_DIR", withAWS: true
             }
         }
     }
