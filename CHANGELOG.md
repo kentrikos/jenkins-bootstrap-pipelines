@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added automation for Grafana's data-source for Prometheus on application account
 - Added automation to create dashboards for both Prometheus datasources (operations and application)
 - Folder vars for pipeline library 'kentrikos-shared-library' 
+- Pipeline steps for :
+
+   ```groovy
+    gitCloneConfigRepo
+    terraformApplyDestroy
+    terraformApply
+    terraformInitApplication
+    terraformInitOperations
+    terraformPlanDestroy
+    terraformPlan
+    withProxyEnv
+    ```
 
 ## [0.4.1] - 2019-03-25
 ### Fixed

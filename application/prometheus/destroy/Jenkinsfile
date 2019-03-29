@@ -10,17 +10,15 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
 
+    environment {
+        OPERTION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERTION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+
+    }
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
 
@@ -49,7 +47,7 @@ pipeline {
 
         stage('Destroy Prometheus/app') {
             steps {
-                dir("application/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_APP_DIR") {
                     withProxyEnv() {
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                             script {
@@ -63,7 +61,7 @@ pipeline {
 
         stage('Read Grafana endpoint') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -82,7 +80,7 @@ pipeline {
 
         stage('Destroy Prometheus_app data-source in Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_app"
@@ -95,7 +93,7 @@ pipeline {
 
         stage('Delete Prometheus/app dashboard from Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERTION_OPS_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaDashboardUID = "kcapp"

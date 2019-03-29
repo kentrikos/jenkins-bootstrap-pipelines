@@ -7,6 +7,7 @@ pipeline {
     }
     environment {
         ENV_K8S_DIR = 'env-eks'
+        OPERTION_DIR = "application/$AWS_REGION/$ENV_K8S_DIR"
     }
     agent any
     stages {
@@ -18,34 +19,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
-                    withProxyEnv() {
-                        withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                            sshagent(['bitbucket-key']) {
-                                sh '''#!/bin/bash -x
-                                terraform init -input=false \
-                                -backend-config="region=${AWS_REGION}" \
-                                -backend-config="bucket=tf-${AWS_APPLICATION_ACCOUNT_NUMBER}-app-${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                                -backend-config="dynamodb_table=tf-state-lock-bootstrap-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}" \
-                                -backend-config="key=tf/tf-aws-product-domain-${PRODUCT_DOMAIN_NAME}-env-${ENVIRONMENT_TYPE}/${ENV_K8S_DIR}/terraform.tfstate"
-                                '''
-                            }
-                        }
-                    }
-                }
+                terraformInitApplication dir: "$OPERTION_DIR", subcomponent: "${ENV_K8S_DIR}", withAWS: true
             }
         }
         stage('Plan') {
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                                sh '/usr/bin/terraform plan -var-file="../terraform.tfvars" -out=tfplan -input=false'
-                            }
-                        }
-                    }
-                }
+                terraformPlan dir: "$OPERTION_DIR", withAWS: true
             }
         }
         stage('Apply') {
@@ -54,15 +33,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("application/$AWS_REGION/$ENV_K8S_DIR") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                                sh '/usr/bin/terraform apply -input=false tfplan'
-                            }
-                        }
-                    }
-                }
+                terraformApply dir: "$OPERTION_DIR", withAWS: true
             }
         }
         stage('Retrieve kubeconfig') {
