@@ -11,6 +11,8 @@ pipeline {
                description: 'Name of existing PV to use for Grafana storage (usually "pvc-*"), leave empty if this is first deployment')
     }
 
+    def grafanaPVCName = ""
+
     stages {
         stage('Git local config') {
             steps {
@@ -82,7 +84,7 @@ pipeline {
 
                             if (GRAFANA_PV) {
                                 println "Restoring from existing PersistentVolume :"
-                                def grafanaPVCName = "grafana"
+                                grafanaPVCName = "grafana"
                                 def grafanaPVC = """
                                 apiVersion: v1
                                 kind: PersistentVolumeClaim
@@ -105,9 +107,9 @@ pipeline {
                                   volumeName: $GRAFANA_PV
                                 """
                                 def grafanaPVPatch = '''
-                                spec:
-                                    claimRef:
-                                      uid:
+spec:
+    claimRef:
+        uid:
                                 '''
                                 writeFile file: 'grafana-pvc.yaml', text: grafanaPVC
                                 sh "kubectl -n lma delete pvc grafana || true"
@@ -115,7 +117,7 @@ pipeline {
                                 sh "kubectl -n lma create -f grafana-pvc.yaml"
                                 
                             } else {
-                                def grafanaPVCName = ""
+                                grafanaPVCName = ""
                             }
                             
                             sh """
