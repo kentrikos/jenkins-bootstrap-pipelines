@@ -1,5 +1,7 @@
 #!groovy
 
+def grafanaPVCName = ""
+
 pipeline {
 
     agent any
@@ -10,8 +12,6 @@ pipeline {
         string(name: 'GRAFANA_PV', defaultValue: "",
                description: 'Name of existing PV to use for Grafana storage (usually "pvc-*"), leave empty if this is first deployment')
     }
-
-    def grafanaPVCName = ""
 
     stages {
         stage('Git local config') {
