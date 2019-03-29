@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added automation for Grafana's data-source for Prometheus on application account
 - Added automation to create dashboards for both Prometheus datasources (operations and application)
+- Added automation for Grafana's persistence (based on K8s PVs)
 
 ## [0.4.1] - 2019-03-25
 ### Fixed
