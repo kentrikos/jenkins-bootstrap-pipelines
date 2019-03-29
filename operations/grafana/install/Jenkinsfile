@@ -112,7 +112,7 @@ pipeline {
                                 writeFile file: 'grafana-pvc.yaml', text: grafanaPVC
                                 sh "kubectl -n lma delete pvc grafana || true"
                                 sh "kubectl patch pv $GRAFANA_PV --patch '$grafanaPVPatch'"
-                                sh "kubectl -n lma create -f grafana_pvc.yaml"
+                                sh "kubectl -n lma create -f grafana-pvc.yaml"
                                 
                             } else {
                                 def grafanaPVCName = ""
