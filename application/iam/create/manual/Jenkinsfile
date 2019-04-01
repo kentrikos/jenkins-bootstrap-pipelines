@@ -1,35 +1,27 @@
 #!groovy
+
+library 'kentrikos-shared-library'
 pipeline {
 
+    environment {
+        OPERATION_DIR = "application/$AWS_REGION/iam/manual"
+        SUBCOMPONENT = "iam"
+    }
     agent any
     stages {
-
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
         stage('Init') {
             steps {
-                dir("application/$AWS_REGION/iam/manual") {
-                    withProxyEnv() {
-                        sshagent(['bitbucket-key']) {
-                            sh '/usr/bin/terraform init -input=false'
-                        }
-                    }
-                }
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUBCOMPONENT", withAWS: false
             }
         }
         stage('Plan') {
             steps {
-                dir("application/$AWS_REGION/iam/manual") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            sh '/usr/bin/terraform plan -var-file="../../terraform.tfvars" -out=tfplan -input=false'
-                        }
-                    }
-                }
+                terraformPlan dir: "$OPERATION_DIR"
             }
         }
         stage('Apply') {
@@ -38,38 +30,8 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                dir("application/$AWS_REGION/iam/manual") {
-                    ansiColor('xterm') {
-                        withProxyEnv() {
-                            sh '/usr/bin/terraform apply -input=false tfplan'
-                        }
-                    }
-                    archiveArtifacts artifacts: 'outputs/**'
-                }
+                terraformApply dir: "$OPERATION_DIR"
             }
         }
-    }
-}
-void withProxyEnv(List envVars = [],  def body) {
-    List proxies =[]
-    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
-        script {
-            if (env.PROXY_HTTP) {
-                proxies << "http_proxy=$PROXY_HTTP"
-            }
-            if (env.PROXY_HTTPs) {
-                proxies << "https_proxy=$PROXY_HTTPS"
-            }
-            if (env.PROXY_NO) {
-                proxies << "no_proxy=$PROXY_NO"
-            }
-            envVaraibles.addAll(proxies)
-        }
-    }
-    envVaraibles.addAll(envVars)
-
-    withEnv(envVaraibles) {
-        body.call()
     }
 }

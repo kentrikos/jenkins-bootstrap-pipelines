@@ -1,5 +1,6 @@
 #!groovy
 
+library 'kentrikos-shared-library'
 pipeline {
 
     agent any
@@ -8,18 +9,13 @@ pipeline {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
                description: 'Choose type of Kubernetes cluster (required for kops)')
     }
-
+    environment {
+        OPERATION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
+    }
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
 
@@ -38,7 +34,7 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     script {
                       sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
@@ -48,7 +44,7 @@ pipeline {
 
         stage('Destroy Prometheus/operations') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             sh 'helm delete --purge prometheus-ops'
@@ -59,7 +55,7 @@ pipeline {
         }
         stage('Read Grafana endpoint') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
@@ -77,7 +73,7 @@ pipeline {
         }
         stage('Destroy Prometheus_ops data-source in Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def prometheusDataSourceName = "Prometheus_ops"
@@ -90,7 +86,7 @@ pipeline {
 
         stage('Delete Prometheus/ops dashboard from Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaDashboardUID = "kcops"
@@ -103,25 +99,3 @@ pipeline {
     }
 }
 
-void withProxyEnv(List envVars = [], def body) {
-    List proxies = []
-    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
-        script {
-            if (env.PROXY_HTTP) {
-                proxies << "http_proxy=$PROXY_HTTP"
-            }
-            if (env.PROXY_HTTPS) {
-                proxies << "https_proxy=$PROXY_HTTPS"
-            }
-            if (env.PROXY_NO) {
-                proxies << "no_proxy=$PROXY_NO"
-            }
-            envVaraibles.addAll(proxies)
-        }
-    }
-    envVaraibles.addAll(envVars)
-    withEnv(envVaraibles) {
-        body.call()
-    }
-}

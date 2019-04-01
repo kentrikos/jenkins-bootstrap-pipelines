@@ -1,25 +1,21 @@
 #!groovy
 
+library 'kentrikos-shared-library'
 pipeline {
 
     agent any
 
     parameters {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
-               description: 'Choose type of Kubernetes cluster (required for kops)')
+                description: 'Choose type of Kubernetes cluster (required for kops)')
     }
-
+    environment {
+        OPERATION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
+    }
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
 
@@ -27,9 +23,9 @@ pipeline {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
-                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
                     } else {
-                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
                     }
                     println K8S_CLUSTER_NAME
                 }
@@ -38,23 +34,23 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     script {
-                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
+                        sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
                 }
             }
         }
 
-       stage('Read DNS domain') {
+        stage('Read DNS domain') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
                             prometheusEndpoint = "prometheus." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
                             grafanaEndpoint = "grafana." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
@@ -66,7 +62,7 @@ pipeline {
 
         stage('Deploy Prometheus/ops') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             sh """
@@ -82,7 +78,7 @@ pipeline {
  
         stage('Add Prometheus/ops data-source to Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
@@ -108,7 +104,7 @@ pipeline {
 
         stage('Add Prometheus/ops dashboard to Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafanaParameters = readYaml file: 'grafana/parameters.yaml'
@@ -131,28 +127,5 @@ pipeline {
                 }
             }
         }
-    }
-}
-
-void withProxyEnv(List envVars = [], def body) {
-    List proxies = []
-    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
-        script {
-            if (env.PROXY_HTTP) {
-                proxies << "http_proxy=$PROXY_HTTP"
-            }
-            if (env.PROXY_HTTPS) {
-                proxies << "https_proxy=$PROXY_HTTPS"
-            }
-            if (env.PROXY_NO) {
-                proxies << "no_proxy=$PROXY_NO"
-            }
-            envVaraibles.addAll(proxies)
-        }
-    }
-    envVaraibles.addAll(envVars)
-    withEnv(envVaraibles) {
-        body.call()
     }
 }

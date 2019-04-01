@@ -1,5 +1,6 @@
 #!groovy
 
+library 'kentrikos-shared-library'
 
 def grafanaPVCName = ""
 def grafanaPVPatch = '''
@@ -14,32 +15,26 @@ pipeline {
 
     parameters {
         choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
-               description: 'Choose type of Kubernetes cluster (required for kops)')
+                description: 'Choose type of Kubernetes cluster (required for kops)')
         string(name: 'GRAFANA_PV', defaultValue: "",
-               description: 'Name of existing PV to use for Grafana storage (usually "pvc-*"), leave empty if this is first deployment')
+                description: 'Name of existing PV to use for Grafana storage (usually "pvc-*"), leave empty if this is first deployment')
     }
-
+    environment {
+        OPERATION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
+    }
     stages {
-        stage('Git local config') {
-            steps {
-                sh 'git config --global --add user.name "example"'
-                sh 'git config --global --add user.email "example@example.com"'
-            }
-        }
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
-
         stage('Get K8s cluster flavor') {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
-                      K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
                     } else {
-                      K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
                     }
                     println K8S_CLUSTER_NAME
                 }
@@ -48,9 +43,9 @@ pipeline {
 
         stage('Switch kubectl context to ops') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     script {
-                      sh "kubectl config use-context $K8S_CLUSTER_NAME"
+                        sh "kubectl config use-context $K8S_CLUSTER_NAME"
                     }
                 }
             }
@@ -58,7 +53,7 @@ pipeline {
 
         stage('Check/create LMA namespace') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             sh '''
@@ -77,15 +72,15 @@ pipeline {
 
         stage('Deploy Grafana') {
             steps {
-                dir("operations/$AWS_REGION/env-$K8S_FLAVOR") {
+                dir("$OPERATION_DIR") {
                     withProxyEnv() {
                         script {
                             def grafana_parameters = readYaml file: 'grafana/parameters.yaml'
                             def jenkins_parameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'", 
-                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                    returnStdout: true).trim().replaceAll("\\.\$", "")
                             def grafana_address = "grafana." + jenkins_parameters.domainAliasPrefix + "." + r53DomainName
 
                             if (GRAFANA_PV) {
@@ -119,7 +114,7 @@ pipeline {
                             } else {
                                 grafanaPVCName = ""
                             }
-                            
+
                             sh """
                             #!/bin/bash
                             helm install --replace --wait --name grafana --namespace lma stable/grafana \
@@ -131,28 +126,5 @@ pipeline {
                 }
             }
         }
-    }
-}
-
-void withProxyEnv(List envVars = [], def body) {
-    List proxies = []
-    List envVaraibles = ['GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no']
-    withAWSParameterStore(credentialsId: '', namePrefixes: '', naming: 'relative', path: "/$PRODUCT_DOMAIN_NAME/$ENVIRONMENT_TYPE", recursive: true, regionName: "$AWS_REGION") {
-        script {
-            if (env.PROXY_HTTP) {
-                proxies << "http_proxy=$PROXY_HTTP"
-            }
-            if (env.PROXY_HTTPS) {
-                proxies << "https_proxy=$PROXY_HTTPS"
-            }
-            if (env.PROXY_NO) {
-                proxies << "no_proxy=$PROXY_NO"
-            }
-            envVaraibles.addAll(proxies)
-        }
-    }
-    envVaraibles.addAll(envVars)
-    withEnv(envVaraibles) {
-        body.call()
     }
 }

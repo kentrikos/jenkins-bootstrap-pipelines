@@ -2,7 +2,7 @@
 
 This repo contain Jenkins pipeline definition for project Kentrikos.
 
-## Requriements
+## Requirements
 
 Best option to use is from jenkins installed by terraform module from [kentrikos/terraform-aws-bootstrap-jenkins](https://github.com/kentrikos/terraform-aws-bootstrap-jenkins) 
 

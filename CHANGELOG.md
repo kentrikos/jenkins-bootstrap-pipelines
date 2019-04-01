@@ -5,12 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Added
+### Changed 
+- Add import library 'kentrikos-shared-library' to each pipeline
+- Moved withProxyEnv to library 'kentrikos-shared-library'
+- New parameter for R53 HostedZoneID for LMA jobs (jx-related params were used before)
+
+### Added 
 - Added automation for Grafana's data-source for Prometheus on application account
 - Added automation to create dashboards for both Prometheus datasources (operations and application)
-- Added automation for Grafana's persistence (based on K8s PVs)
-### Changed
-- New parameter for R53 HostedZoneID for LMA jobs (jx-related params were used before)
+- Folder vars for pipeline library 'kentrikos-shared-library' 
+- Pipeline steps for :
+
+   ```groovy
+    gitCloneConfigRepo
+    terraformApplyDestroy
+    terraformApply
+    terraformInitApplication
+    terraformInitOperations
+    terraformPlanDestroy
+    terraformPlan
+    withProxyEnv
+    ```
 
 ## [0.4.1] - 2019-03-25
 ### Fixed
