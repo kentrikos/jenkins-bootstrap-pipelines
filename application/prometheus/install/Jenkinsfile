@@ -19,7 +19,7 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERATION_OPS_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_OPS_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
         OPERATION_APP_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
 
     }
