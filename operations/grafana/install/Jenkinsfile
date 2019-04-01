@@ -84,9 +84,9 @@ pipeline {
                             def jenkins_parameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'", 
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkins_parameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'", 
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            def grafana_address = "grafana." + jenkins_parameters.jxDomainAliasPrefix + "." + r53DomainName
+                            def grafana_address = "grafana." + jenkins_parameters.domainAliasPrefix + "." + r53DomainName
 
                             if (GRAFANA_PV) {
                                 println "Restoring from existing PersistentVolume :"

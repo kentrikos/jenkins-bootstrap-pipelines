@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added automation for Grafana's data-source for Prometheus on application account
 - Added automation to create dashboards for both Prometheus datasources (operations and application)
 - Added automation for Grafana's persistence (based on K8s PVs)
+### Changed
+- New parameter for R53 HostedZoneID for LMA jobs (jx-related params were used before)
 
 ## [0.4.1] - 2019-03-25
 ### Fixed
