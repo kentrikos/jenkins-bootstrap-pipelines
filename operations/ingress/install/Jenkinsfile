@@ -76,9 +76,9 @@ pipeline {
                             def parameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'",
-                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            r53WildcardRecordName = "*." + parameters.jxDomainAliasPrefix + "." + r53DomainName
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + parameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            r53WildcardRecordName = "*." + parameters.domainAliasPrefix + "." + r53DomainName
 
                             println "Getting ingress NLB information"
                             ingressNLBAddress = sh(script: "kubectl get service -n kube-system opsing-nginx-ingress-controller -o json | jq -r '.status.loadBalancer.ingress[0].hostname'",
@@ -108,7 +108,7 @@ pipeline {
                             sh "cat opsing_r53_alias.json"
 
                             println "Creating/updating Route53 entry"
-                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.jxDomainHostedZoneID + " --change-batch file://opsing_r53_alias.json"
+                            sh "aws route53 change-resource-record-sets --hosted-zone-id " + parameters.domainHostedZoneID + " --change-batch file://opsing_r53_alias.json"
                         }
                     }
                 }

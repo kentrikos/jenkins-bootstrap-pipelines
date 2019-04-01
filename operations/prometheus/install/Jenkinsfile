@@ -50,10 +50,10 @@ pipeline {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'",
-                                    returnStdout: true).trim().replaceAll("\\.\$", "")
-                            prometheusEndpoint = "prometheus." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
-                            grafanaEndpoint = "grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
+                            prometheusEndpoint = "prometheus." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
+                            grafanaEndpoint = "grafana." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
                         }
                     }
                 }

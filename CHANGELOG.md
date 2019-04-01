@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed 
 - Add import library 'kentrikos-shared-library' to each pipeline
 - Moved withProxyEnv to library 'kentrikos-shared-library'
+- New parameter for R53 HostedZoneID for LMA jobs (jx-related params were used before)
 
 ### Added 
 - Added automation for Grafana's data-source for Prometheus on application account

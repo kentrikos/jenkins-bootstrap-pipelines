@@ -74,7 +74,7 @@ pipeline {
             }
         }
 
-       stage('Deploy Prometheus/app') {
+        stage('Deploy Prometheus/app') {
             steps {
                 dir("$OPERATION_APP_DIR") {
                     withProxyEnv() {
@@ -90,9 +90,9 @@ pipeline {
                     }
                 }
             }
-       }
+        }
 
-       stage('Read DNS information') {
+        stage('Read DNS information') {
             steps {
                 dir("$OPERATION_OPS_DIR") {
                     withProxyEnv() {
@@ -100,15 +100,15 @@ pipeline {
                             def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
 
                             println "Getting domain name for Grafana"
-                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.jxDomainHostedZoneID + " --output text --query 'HostedZone.Name'",
-                                                   returnStdout: true).trim().replaceAll("\\.\$", "")
-                            grafanaEndpoint = "grafana." + jenkinsParameters.jxDomainAliasPrefix + "." + r53DomainName
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                    returnStdout: true).trim().replaceAll("\\.\$", "")
+                            grafanaEndpoint = "grafana." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
                         }
                         withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                             script {
                                 println "Getting ELB DNS name for Prometheus"
                                 prometheusEndpoint = sh(script: "kubectl -n lma get service prometheus-app-server -o json | jq -r '.status.loadBalancer.ingress[].hostname'",
-                                                        returnStdout: true).trim().replaceAll("\\.\$", "")
+                                        returnStdout: true).trim().replaceAll("\\.\$", "")
                             }
                         }
                     }
@@ -151,8 +151,8 @@ pipeline {
                             def grafanaAdminPassword = grafanaParameters.defaultAdminPassword
                             println "Downloading and adjusting dashboard:"
                             sh "curl https://grafana.com/api/dashboards/6417/revisions/1/download -o grafana_dashboard_kubernetes_cluster.json"
-                            dashboardJSON =  sh(script: 'jq --arg id 0 --arg uid kcapp --arg title "Kubernetes Cluster/app" ".id=\\\$uid | .uid=\\\$uid | .title=\\\$title" grafana_dashboard_kubernetes_cluster.json | sed -e "s/\\\${DS_PROMETHEUS}/Prometheus_app/g"',
-                                                returnStdout: true).trim().replaceAll("\\.\$", "")
+                            dashboardJSON = sh(script: 'jq --arg id 0 --arg uid kcapp --arg title "Kubernetes Cluster/app" ".id=\\\$uid | .uid=\\\$uid | .title=\\\$title" grafana_dashboard_kubernetes_cluster.json | sed -e "s/\\\${DS_PROMETHEUS}/Prometheus_app/g"',
+                                    returnStdout: true).trim().replaceAll("\\.\$", "")
                             println "Creating dashboard:"
                             def requestJson = """
                             {
