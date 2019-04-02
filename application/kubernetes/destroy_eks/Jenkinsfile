@@ -7,7 +7,6 @@ pipeline {
         ENV_K8S_DIR = 'env-eks'
         OPERATION_DIR = "application/$AWS_REGION/$ENV_K8S_DIR"
     }
-    agent any
     stages {
         stage('Git clone') {
             steps {

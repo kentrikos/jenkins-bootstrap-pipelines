@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2019-04-02
+### Fixed
+-Fix double `agent any` in destroy eks on application Jenkinsfile
+
 ## [0.5.0] - 2019-04-01
 ### Changed 
 - Add import library 'kentrikos-shared-library' to each pipeline
