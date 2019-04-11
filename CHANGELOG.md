@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added 
+- Added new library steps to switch kubectl context
+- Added ECR Create repo step to library
+- Added step to clone app repo to library
+
+### Changed 
+- Update jobs to use new steps to switch kubectl context
 
 ## [0.5.1] - 2019-04-02
 ### Fixed
