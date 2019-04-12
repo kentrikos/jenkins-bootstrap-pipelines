@@ -11,7 +11,7 @@ def call(Map config) {
             ansiColor('xterm') {
                 withProxyEnv() {
                     withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
-                        sh '/usr/bin/terraform apply -input=false tfplan -lock=false'
+                        sh '/usr/bin/terraform apply -input=false -lock=false tfplan'
                     }
                 }
             }
@@ -21,7 +21,7 @@ def call(Map config) {
         dir("${config.dir}") {
             ansiColor('xterm') {
                 withProxyEnv() {
-                    sh '/usr/bin/terraform apply -input=false tfplan -lock=false'
+                    sh '/usr/bin/terraform apply -input=false -lock=false tfplan'
                 }
             }
             archiveArtifacts artifacts: 'outputs/**', allowEmptyArchive: true
