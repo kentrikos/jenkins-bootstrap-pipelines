@@ -59,7 +59,7 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERATION_DIR", args: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"create_es_service_linked_role=${CREATE_ES_SERVICE_ROLE}\""
+                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"create_es_service_linked_role=${CREATE_ES_SERVICE_ROLE}\""
             }
         }
         stage('Apply') {
