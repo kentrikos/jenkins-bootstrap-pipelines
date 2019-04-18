@@ -42,12 +42,15 @@ pipeline {
                 }
             }
         }
-        stage('Check for existing ES service role') {
+        stage('Create ES service linked role') {
             steps {
                 withProxyEnv() {
                     script {
-                        CREATE_ES_SERVICE_ROLE = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
-                                        returnStdout: true).trim().length() == 0
+                        ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
+                                        returnStdout: true).trim().length() > 0
+                        if (!ES_ROLE_EXISTS){
+                            sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
+                        }
                     }
                 }
             }
@@ -59,7 +62,7 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"create_es_service_linked_role=${CREATE_ES_SERVICE_ROLE}\""
+                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
             }
         }
         stage('Apply') {
