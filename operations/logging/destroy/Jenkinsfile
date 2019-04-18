@@ -1,0 +1,65 @@
+#!groovy
+
+import groovy.json.JsonOutput
+
+library 'kentrikos-shared-library'
+pipeline {
+
+    agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+                description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+    environment {
+        OPERATION_DIR = "operations/$AWS_REGION/logging"
+        SUB_COMPONENT = "logging"
+    }
+    stages {
+        stage('Git clone') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Get cluster context') {
+            steps {
+                script {
+                    if (env.K8S_FLAVOR == "eks") {
+                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                    } else {
+                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                    }
+                    println K8S_CLUSTER_NAME
+                }
+            }
+        }
+        stage('Switch kubectl context to ops') {
+            steps {
+                dir("$OPERATION_DIR") {
+                    script {
+                        sh "kubectl config use-context $K8S_CLUSTER_NAME"
+                    }
+                }
+            }
+        }
+        stage('Init') {
+            steps {
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
+            }
+        }
+        stage('Plan') {
+            steps {
+                terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApplyDestroy dir: "$OPERATION_DIR"
+            }
+        }
+    }
+}
