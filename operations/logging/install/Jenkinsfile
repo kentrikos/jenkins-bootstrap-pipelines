@@ -21,7 +21,7 @@ pipeline {
                 gitCloneConfigRepo()
             }
         }
-        stage('Get Cluster context') {
+        stage('Get cluster context') {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
@@ -42,6 +42,16 @@ pipeline {
                 }
             }
         }
+        stage('Check for existing ES service role') {
+            steps {
+                withProxyEnv() {
+                    script {
+                        CREATE_ES_SERVICE_ROLE = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
+                                        returnStdout: true).trim().length() == 0
+                    }
+                }
+            }
+        }
         stage('Init') {
             steps {
                 terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
@@ -49,7 +59,7 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERATION_DIR", args: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+                terraformPlan dir: "$OPERATION_DIR", args: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"create_es_service_linked_role=${CREATE_ES_SERVICE_ROLE}\""
             }
         }
         stage('Apply') {
