@@ -35,9 +35,9 @@ pipeline {
             steps {
                 script {
                     if (env.K8S_FLAVOR == "eks") {
-                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
+                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_APPLICATION_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE"
                     } else {
-                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
+                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE.k8s.local"
                     }
                     println K8S_CLUSTER_NAME
                 }
@@ -54,12 +54,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
             }
         }
         stage('Plan') {
             steps {
-                terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\""
+                terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"", withAWS: true
             }
         }
         stage('Apply') {
@@ -68,7 +68,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApplyDestroy dir: "$OPERATION_DIR"
+                terraformApplyDestroy dir: "$OPERATION_DIR", withAWS: true
             }
         }
     }
