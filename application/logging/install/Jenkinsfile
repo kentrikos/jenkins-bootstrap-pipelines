@@ -54,12 +54,12 @@ pipeline {
         }
         stage('Init') {
             steps {
-                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
             }
         }
         stage('Plan') {
             steps {
-                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\""
+                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"", withAWS: true
             }
         }
         stage('Apply') {
@@ -68,7 +68,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApply dir: "$OPERATION_DIR"
+                terraformApply dir: "$OPERATION_DIR", withAWS: true
             }
         }
     }
