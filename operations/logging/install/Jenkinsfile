@@ -12,13 +12,88 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERATION_DIR = "operations/$AWS_REGION/logging"
         SUB_COMPONENT = "logging"
+        OPERATION_DIR = "operations/$AWS_REGION/$SUB_COMPONENT"
+        REPO_NAME = "${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-fluentd-elasticsearch"
+        GIT_URI = "https://github.com/kentrikos/fluentd-aws-elasticsearch.git"
     }
     stages {
-        stage('Git clone') {
+        stage('Create image repository') {
             steps {
-                gitCloneConfigRepo()
+                withProxyEnv() {
+                    script {
+                        //check for repo
+                        repo_uri = sh(script: "aws ecr describe-repositories --region ${AWS_REGION} --repository-names ${REPO_NAME} --output text --query 'repositories[0].repositoryUri' || true", returnStdout: true).trim()
+                        //if not found create
+                        if (repo_uri == "") {
+                            repo_uri = sh(script: "aws ecr create-repository --region ${AWS_REGION} --repository-name ${REPO_NAME} --output text --query 'repository.repositoryUri'", returnStdout: true).trim()
+                        }
+                        println "Repository Uri: " + repo_uri
+                    }
+                }
+            }
+        }
+        stage('Build Fluentd image') {
+            steps {
+                withProxyEnv() {
+                    script {
+                    // Pull docker image from repo
+                        git url: "${GIT_URI}"
+                    // build image
+                        sh(script: "docker build -t fluentd-aws-elasticsearch .")
+                    }
+                }
+            }
+        }
+        stage('Tag and push image') {
+            steps {
+                withProxyEnv() {
+                    script {
+                        // tag repo
+                        sh(script: "docker tag fluentd-aws-elasticsearch ${repo_uri}")
+                        //login to repo
+                        sh(script: "\$(aws ecr get-login --no-include-email --region ${AWS_REGION})")
+                        //push image
+                        sh(script: "docker push ${repo_uri}")
+                    }
+                }
+            }
+        }
+        // stage('Git clone configuration repo') {
+        //     steps {
+        //         gitCloneConfigRepo()
+        //     }
+        // }
+        stage('Create ES service linked role') {
+            steps {
+                withProxyEnv() {
+                    script {
+                        ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
+                                        returnStdout: true).trim().length() > 0
+                        if (!ES_ROLE_EXISTS){
+                            sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
+                        }
+                    }
+                }
+            }
+        }
+        stage('Init terraform') {
+            steps {
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
+            }
+        }
+        stage('Plan terraform') {
+            steps {
+                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+            }
+        }
+        stage('Apply terraform') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "$OPERATION_DIR"
             }
         }
         stage('Get cluster context') {
@@ -42,36 +117,11 @@ pipeline {
                 }
             }
         }
-        stage('Create ES service linked role') {
+        stage('Deploy Fluentd'){
             steps {
-                withProxyEnv() {
-                    script {
-                        ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
-                                        returnStdout: true).trim().length() > 0
-                        if (!ES_ROLE_EXISTS){
-                            sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
-                        }
-                    }
+                script {
+                    //tbd
                 }
-            }
-        }
-        stage('Init') {
-            steps {
-                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
-            }
-        }
-        stage('Plan') {
-            steps {
-                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
-            }
-        }
-        stage('Apply') {
-            input {
-                message "Should we continue?"
-                ok "Yes, we should."
-            }
-            steps {
-                terraformApply dir: "$OPERATION_DIR"
             }
         }
     }
