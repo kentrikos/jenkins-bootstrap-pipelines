@@ -14,67 +14,60 @@ pipeline {
     environment {
         SUB_COMPONENT = "logging"
         OPERATION_DIR = "operations/$AWS_REGION/$SUB_COMPONENT"
-        REPO_NAME = "${AWS_REGION}-${PRODUCT_DOMAIN_NAME}-${ENVIRONMENT_TYPE}-fluentd-elasticsearch"
         GIT_URI = "https://github.com/kentrikos/fluentd-aws-elasticsearch.git"
+
+        APP_NAME = 'fluentd-elasticsearch'
+        ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
+        ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
     }
     stages {
         stage('Create image repository') {
             steps {
-                withProxyEnv() {
-                    script {
-                        //check for repo
-                        repo_uri = sh(script: "aws ecr describe-repositories --region ${AWS_REGION} --repository-names ${REPO_NAME} --output text --query 'repositories[0].repositoryUri' || true", returnStdout: true).trim()
-                        //if not found create
-                        if (repo_uri == "") {
-                            repo_uri = sh(script: "aws ecr create-repository --region ${AWS_REGION} --repository-name ${REPO_NAME} --output text --query 'repository.repositoryUri'", returnStdout: true).trim()
-                        }
-                        println "Repository Uri: " + repo_uri
-                    }
-                }
+                ecrCreateRepository repo_name: "$ECR_REPO_NAME"
             }
         }
-        stage('Build Fluentd image') {
+        stage('Build Fluentd image, Tag and push') {
             steps {
-                withProxyEnv() {
-                    script {
-                    // Pull docker image from repo
-                        git url: "${GIT_URI}"
-                    // build image
-                        sh(script: "docker build -t fluentd-aws-elasticsearch .")
-                    }
-                }
-            }
-        }
-        stage('Tag and push image') {
-            steps {
-                withProxyEnv() {
-                    script {
+                ws("${env.JOB_NAME}-image") {
+                    gitCloneConfigRepo()
+                    withProxyEnv() {
+                        // Pull docker image from repo
+                        gitCloneAppRepo repo: "$GIT_URI"
+                        // build image
+                        sh 'docker build -t $APP_NAME:latest .'
                         // tag repo
-                        sh(script: "docker tag fluentd-aws-elasticsearch ${repo_uri}")
+                        sh 'docker tag $APP_NAME $ECR_REPO'
                         //login to repo
-                        sh(script: "\$(aws ecr get-login --no-include-email --region ${AWS_REGION})")
+                        sh 'eval $(aws ecr get-login --no-include-email --region $AWS_REGION | sed "s|https://||")'
+
                         //push image
-                        sh(script: "docker push ${repo_uri}")
+                        sh 'docker push  $ECR_REPO'
                     }
                 }
             }
         }
-        // stage('Git clone configuration repo') {
-        //     steps {
-        //         gitCloneConfigRepo()
-        //     }
-        // }
+
         stage('Create ES service linked role') {
             steps {
                 withProxyEnv() {
                     script {
                         ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
-                                        returnStdout: true).trim().length() > 0
-                        if (!ES_ROLE_EXISTS){
+                                returnStdout: true).trim().length() > 0
+                        if (!ES_ROLE_EXISTS) {
                             sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
                         }
                     }
                 }
+            }
+        }
+        stage('Switch K8S context') {
+            steps {
+                kubectlSwitchContextOps()
+            }
+        }
+        stage('Git clone configuration repo') {
+            steps {
+                gitCloneConfigRepo()
             }
         }
         stage('Init terraform') {
@@ -84,7 +77,10 @@ pipeline {
         }
         stage('Plan terraform') {
             steps {
-                terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+                script {
+                    K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
+                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+                }
             }
         }
         stage('Apply terraform') {
@@ -94,34 +90,6 @@ pipeline {
             }
             steps {
                 terraformApply dir: "$OPERATION_DIR"
-            }
-        }
-        stage('Get cluster context') {
-            steps {
-                script {
-                    if (env.K8S_FLAVOR == "eks") {
-                        K8S_CLUSTER_NAME = "arn:aws:eks:$AWS_REGION:$AWS_OPERATIONS_ACCOUNT_NUMBER:cluster/$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops"
-                    } else {
-                        K8S_CLUSTER_NAME = "$AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops.k8s.local"
-                    }
-                    println K8S_CLUSTER_NAME
-                }
-            }
-        }
-        stage('Switch kubectl context to ops') {
-            steps {
-                dir("$OPERATION_DIR") {
-                    script {
-                        sh "kubectl config use-context $K8S_CLUSTER_NAME"
-                    }
-                }
-            }
-        }
-        stage('Deploy Fluentd'){
-            steps {
-                script {
-                    //tbd
-                }
             }
         }
     }
