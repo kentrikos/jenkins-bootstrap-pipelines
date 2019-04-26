@@ -11,8 +11,6 @@ def call(Map config) {
         extraArgs = config.extraArgs
     }
 
-
-
     if (with_aws) {
         dir("${config.dir}") {
             ansiColor('xterm') {
