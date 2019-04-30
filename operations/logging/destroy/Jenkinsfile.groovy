@@ -12,8 +12,12 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERATION_DIR = "operations/$AWS_REGION/logging"
         SUB_COMPONENT = "logging"
+        OPERATION_DIR = "operations/$AWS_REGION/$SUB_COMPONENT"
+
+        APP_NAME = 'fluentd-elasticsearch'
+        ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
+        ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
     }
     stages {
         stage('Git clone') {
@@ -23,9 +27,7 @@ pipeline {
         }
         stage('Switch K8S context') {
             steps {
-                steps {
-                    kubectlSwitchContextOps()
-                }
+                kubectlSwitchContextOps()
             }
         }
         stage('Init') {
@@ -37,7 +39,7 @@ pipeline {
             steps {
                 script {
                     K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
-                    terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\""
+                    terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\""
                 }
             }
         }
