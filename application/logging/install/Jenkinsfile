@@ -12,11 +12,44 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERATION_DIR = "application/$AWS_REGION/logging"
         SUB_COMPONENT = "logging"
+        OPERATION_DIR = "application/$AWS_REGION/$SUB_COMPONENT"
+
+        GIT_URI = "https://github.com/kentrikos/fluentd-aws-elasticsearch.git"
+
+        APP_NAME = 'fluentd-elasticsearch'
+        ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
+        ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
     }
     
     stages {
+        stage('Grant Cross-Account access to ECR') {
+            steps {
+                withProxyEnv() {
+                    script {
+                        def ecrPolicyJSON = """
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "AllowPull",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ecr:BatchGetImage",
+                                        "ecr:GetDownloadUrlForLayer"
+                                    ],
+                                    "Principal": {
+                                        "AWS": ["arn:aws:iam::${AWS_APPLICATION_ACCOUNT_NUMBER}:root"]
+                                    }
+                                }
+                            ]
+                        }
+                        """
+                        sh(script: "aws ecr get-repository-policy --repository-name ${ECR_REPO_NAME} || aws ecr set-repository-policy --repository-name ${ECR_REPO_NAME} --policy-text ${ecrPolicyJSON}")
+                    }
+                }
+            }
+        }
         stage('Retrieve ElasticSearch endpoint') {
             steps {
                 withProxyEnv() {
@@ -36,27 +69,27 @@ pipeline {
                 kubectlSwitchContextApp()
             }
         }
-        stage('Init') {
-            steps {
-                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
-            }
-        }
-        stage('Plan') {
-            steps {
-                script {
-                    K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
-                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"", withAWS: true
-                }
-            }
-        }
-        stage('Apply') {
-            input {
-                message "Should we continue?"
-                ok "Yes, we should."
-            }
-            steps {
-                terraformApply dir: "$OPERATION_DIR", withAWS: true
-            }
-        }
+        // stage('Init') {
+        //     steps {
+        //         terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
+        //     }
+        // }
+        // stage('Plan') {
+        //     steps {
+        //         script {
+        //             K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
+        //             terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"", withAWS: true
+        //         }
+        //     }
+        // }
+        // stage('Apply') {
+        //     input {
+        //         message "Should we continue?"
+        //         ok "Yes, we should."
+        //     }
+        //     steps {
+        //         terraformApply dir: "$OPERATION_DIR", withAWS: true
+        //     }
+        // }
     }
 }
