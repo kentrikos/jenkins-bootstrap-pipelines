@@ -45,7 +45,9 @@ pipeline {
                             ]
                         }
                         """
-                        sh(script: "aws ecr get-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} || aws ecr set-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} --policy-text ${ecrPolicyJSON}")
+                        writeFile file: 'ecr_policy.json', text: ecrPolicyJSON
+
+                        sh(script: "aws ecr get-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} || aws ecr set-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} --policy-text \"\$(cat ecr_policy.json)\"", returnStdout: true)
                     }
                 }
             }
@@ -54,7 +56,7 @@ pipeline {
             steps {
                 withProxyEnv() {
                     script {                    
-                        ES_ENDPOINT = sh(script: "aws es describe-elasticsearch-domain --domain-name $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE-ops --query 'DomainStatus.Endpoints' --output text  --region $AWS_REGION", returnStdout: true)
+                        ES_ENDPOINT = sh(script: "aws es describe-elasticsearch-domain --domain-name $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE --query 'DomainStatus.Endpoints' --output text  --region $AWS_REGION", returnStdout: true)
                     }
                 }
             }
@@ -69,27 +71,27 @@ pipeline {
                 kubectlSwitchContextApp()
             }
         }
-        // stage('Init') {
-        //     steps {
-        //         terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
-        //     }
-        // }
-        // stage('Plan') {
-        //     steps {
-        //         script {
-        //             K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
-        //             terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"", withAWS: true
-        //         }
-        //     }
-        // }
-        // stage('Apply') {
-        //     input {
-        //         message "Should we continue?"
-        //         ok "Yes, we should."
-        //     }
-        //     steps {
-        //         terraformApply dir: "$OPERATION_DIR", withAWS: true
-        //     }
-        // }
+        stage('Init') {
+            steps {
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
+            }
+        }
+        stage('Plan') {
+            steps {
+                script {
+                    K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
+                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"  -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\"", withAWS: true
+                }
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "$OPERATION_DIR", withAWS: true
+            }
+        }
     }
 }
