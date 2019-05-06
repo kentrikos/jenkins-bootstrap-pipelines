@@ -45,7 +45,7 @@ pipeline {
                             ]
                         }
                         """
-                        sh(script: "aws ecr get-repository-policy --repository-name ${ECR_REPO_NAME} || aws ecr set-repository-policy --repository-name ${ECR_REPO_NAME} --policy-text ${ecrPolicyJSON}")
+                        sh(script: "aws ecr get-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} || aws ecr set-repository-policy --region ${AWS_REGION} --repository-name ${ECR_REPO_NAME} --policy-text ${ecrPolicyJSON}")
                     }
                 }
             }
