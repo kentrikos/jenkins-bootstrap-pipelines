@@ -80,7 +80,7 @@ pipeline {
             steps {
                 script {
                     K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
-                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"  -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\"", withAWS: true
+                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\"  -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\" -var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
                 }
             }
         }
