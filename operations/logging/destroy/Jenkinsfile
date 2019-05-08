@@ -14,7 +14,7 @@ pipeline {
     environment {
         SUB_COMPONENT = "logging"
         OPERATION_DIR = "operations/$AWS_REGION/$SUB_COMPONENT"
-
+        
         APP_NAME = 'fluentd-elasticsearch'
         ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
         ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
@@ -50,6 +50,11 @@ pipeline {
             }
             steps {
                 terraformApplyDestroy dir: "$OPERATION_DIR"
+            }
+        }
+        stage('Remove image repository') {
+            steps {
+                ecrDeleteRepository repo_name: "$ECR_REPO_NAME"
             }
         }
     }
