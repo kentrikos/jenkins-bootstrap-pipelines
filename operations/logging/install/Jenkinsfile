@@ -1,0 +1,96 @@
+#!groovy
+
+import groovy.json.JsonOutput
+
+library 'kentrikos-shared-library'
+pipeline {
+
+    agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+                description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+    environment {
+        SUB_COMPONENT = "logging"
+        OPERATION_DIR = "operations/$AWS_REGION/$SUB_COMPONENT"
+        GIT_URI = "https://github.com/kentrikos/fluentd-aws-elasticsearch.git"
+
+        APP_NAME = 'fluentd-elasticsearch'
+        ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
+        ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
+    }
+    stages {
+        stage('Create image repository') {
+            steps {
+                ecrCreateRepository repo_name: "$ECR_REPO_NAME"
+            }
+        }
+        stage('Build Fluentd image, Tag and push') {
+            steps {
+                ws("${env.JOB_NAME}-image") {
+                    gitCloneConfigRepo()
+                    withProxyEnv() {
+                        // Pull docker image from repo
+                        gitCloneAppRepo repo: "$GIT_URI"
+                        // build image
+                        sh 'docker build -t $APP_NAME:latest .'
+                        // tag repo
+                        sh 'docker tag $APP_NAME $ECR_REPO'
+                        //login to repo
+                        sh 'eval $(aws ecr get-login --no-include-email --region $AWS_REGION | sed "s|https://||")'
+
+                        //push image
+                        sh 'docker push  $ECR_REPO'
+                    }
+                }
+            }
+        }
+
+        stage('Create ES service linked role') {
+            steps {
+                withProxyEnv() {
+                    script {
+                        ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
+                                returnStdout: true).trim().length() > 0
+                        if (!ES_ROLE_EXISTS) {
+                            sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
+                        }
+                    }
+                }
+            }
+        }
+        stage('Switch K8S context') {
+            steps {
+                kubectlSwitchContextOps()
+            }
+        }
+        stage('Git clone configuration repo') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Init terraform') {
+            steps {
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT"
+            }
+        }
+        stage('Plan terraform') {
+            steps {
+                script {
+                    K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
+                    terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\""
+                }
+            }
+        }
+        stage('Apply terraform') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "$OPERATION_DIR"
+            }
+        }
+    }
+}

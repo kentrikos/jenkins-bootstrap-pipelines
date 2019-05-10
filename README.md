@@ -13,6 +13,7 @@ Job need be run on node with installed:
 * jx
 * helm
 * tiller
+* aws cli
 
 ## Layount
 

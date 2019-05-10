@@ -1,0 +1,66 @@
+#!groovy
+
+import groovy.json.JsonOutput
+
+library 'kentrikos-shared-library'
+pipeline {
+
+    agent any
+
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+                description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+    environment {
+        SUB_COMPONENT = "logging"
+        OPERATION_DIR = "application/$AWS_REGION/$SUB_COMPONENT"
+        GIT_URI = "https://github.com/kentrikos/fluentd-aws-elasticsearch.git"
+
+        APP_NAME = 'fluentd-elasticsearch'
+        ECR_REPO_NAME = "$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE/$APP_NAME"
+        ECR_REPO = "$AWS_OPERATIONS_ACCOUNT_NUMBER" + ".dkr.ecr." + "$AWS_REGION" + ".amazonaws.com/$ECR_REPO_NAME"
+    }
+    stages {
+        stage('Retrieve ElasticSearch endpoint') {
+            steps {
+                withProxyEnv() {
+                    script {                    
+                        ES_ENDPOINT = sh(script: "aws es describe-elasticsearch-domain --domain-name $AWS_REGION-$PRODUCT_DOMAIN_NAME-$ENVIRONMENT_TYPE --query 'DomainStatus.Endpoints' --output text  --region $AWS_REGION", returnStdout: true)
+                    }
+                }
+            }
+        }
+        stage('Git clone') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Switch K8S context') {
+            steps {
+                kubectlSwitchContextApp()
+            }
+        }
+        stage('Init') {
+            steps {
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "$SUB_COMPONENT", withAWS: true
+            }
+        }
+        stage('Plan') {
+            steps {
+                script {
+                    K8S_CLUSTER_NAME = sh(script: "kubectl config current-context", returnStdout: true).trim()
+                    terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_context=${K8S_CLUSTER_NAME}\" -var=\"elasticsearch_endpoint=${ES_ENDPOINT}\" -var=\"fluentd_image_repository=${ECR_REPO}\" -var=\"fluentd_image_tag=latest\" -var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
+                }
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApplyDestroy dir: "$OPERATION_DIR", withAWS: true
+            }
+        }
+    }
+}
