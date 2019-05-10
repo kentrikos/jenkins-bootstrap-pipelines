@@ -5,7 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [0.7.0] - 2019-04-22
+
+## [0.7.0] - 2019-05-10
 ### Added
 - Added ability to pass `extraArgs` to terraformPlan library function (used to pass additional arguments to terraform exec)
 - Added new pipelines to LMA section to install/destroy logging infrastructure in Operations account
