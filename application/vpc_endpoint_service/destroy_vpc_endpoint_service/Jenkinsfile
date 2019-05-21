@@ -7,6 +7,10 @@ pipeline {
         SUBCOMPONENT_DIR = 'vpc_endpoint_service_k8s'
         OPERATION_DIR    = "application/$AWS_REGION/$SUBCOMPONENT_DIR"
     }
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
     stages {
         stage('Git clone') {
             steps {
@@ -20,7 +24,7 @@ pipeline {
         }
         stage('Plan') {
             steps {
-                terraformPlanDestroy dir: "$OPERATION_DIR", withAWS: true
+                terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
             }
         }
         stage('Apply') {
