@@ -23,11 +23,11 @@ pipeline {
             }
         }
         stage('Plan') {
-            script {
               steps {
+                script {
                   terraformPlanDestroy dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
+                }
               }
-            }
         }
         stage('Apply') {
             input {
