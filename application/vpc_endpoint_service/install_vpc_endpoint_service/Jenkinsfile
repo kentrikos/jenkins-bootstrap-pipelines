@@ -27,8 +27,10 @@ pipeline {
             }
         }
         stage('Plan') {
-            steps {
+            script {
+              steps {
                 terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
+              }
             }
         }
         stage('Apply') {
