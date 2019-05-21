@@ -1,0 +1,40 @@
+#!groovy
+
+library 'kentrikos-shared-library'
+pipeline {
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
+    environment {
+        SUBCOMPONENT_DIR = 'vpc_endpoint_service_k8s'
+        OPERATION_DIR    = "application/$AWS_REGION/$SUBCOMPONENT_DIR"
+    }
+    agent any
+    stages {
+        stage('Git clone') {
+            steps {
+                cleanWs()
+                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+            }
+        }
+        stage('Init') {
+            steps {
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "${SUBCOMPONENT_DIR}", withAWS: true
+            }
+        }
+        stage('Plan') {
+            steps {
+                terraformPlan dir: "$OPERATION_DIR", withAWS: true
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "$OPERATION_DIR", withAWS: true
+            }
+        }
+    }
+}
