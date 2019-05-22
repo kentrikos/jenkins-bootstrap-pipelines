@@ -17,8 +17,7 @@ pipeline {
     stages {
         stage('Git clone') {
             steps {
-                cleanWs()
-                git credentialsId: 'bitbucket-key', url: '$CONFIG_REPO_URL'
+                gitCloneConfigRepo()
             }
         }
         stage('Init') {
