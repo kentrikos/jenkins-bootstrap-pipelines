@@ -1,0 +1,45 @@
+#!groovy
+
+library 'kentrikos-shared-library'
+pipeline {
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+               description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+    environment {
+        SUBCOMPONENT_DIR = 'vpc_endpoint_service_k8s'
+        OPERATION_DIR    = "application/$AWS_REGION/$SUBCOMPONENT_DIR"
+    }
+    agent any
+    stages {
+        stage('Git clone') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Init') {
+            steps {
+                terraformInitApplication dir: "$OPERATION_DIR", subcomponent: "${SUBCOMPONENT_DIR}", withAWS: true
+            }
+        }
+        stage('Plan') {
+              steps {
+                script {
+                  terraformPlan dir: "$OPERATION_DIR", extraArgs: "-var=\"cluster_type=${K8S_FLAVOR}\"", withAWS: true
+                }
+              }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApply dir: "$OPERATION_DIR", withAWS: true
+            }
+        }
+    }
+}

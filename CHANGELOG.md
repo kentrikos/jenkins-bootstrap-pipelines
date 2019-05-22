@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2019-05-22
+### Added
+- Jobs to install/destroy VPC Endpoint Service in app account, associated with Kubernetes ingress
+
 ## [0.7.0] - 2019-05-10
 ### Added
 - Added ability to pass `extraArgs` to terraformPlan library function (used to pass additional arguments to terraform exec)
