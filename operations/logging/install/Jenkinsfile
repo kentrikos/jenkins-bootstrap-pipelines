@@ -54,7 +54,7 @@ pipeline {
                         ES_ROLE_EXISTS = sh(script: "aws iam get-role --role-name AWSServiceRoleForAmazonElasticsearchService --output text --query 'Role.RoleName' || true",
                                 returnStdout: true).trim().length() > 0
                         if (!ES_ROLE_EXISTS) {
-                            sh "aws create-service-linked-role --aws-service-name \"es.amazonaws.com\""
+                            sh "aws iam create-service-linked-role --aws-service-name \"es.amazonaws.com\""
                         }
                     }
                 }
