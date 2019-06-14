@@ -67,7 +67,7 @@ pipeline {
                                 /*
                                  * FIXME: ingress should be used (to be implemented after deciding how to handle R53 domains in app account)
                                  */
-                                sh "helm upgrade  prometheus-ops stable/prometheus --install -wait --namespace lma --values prometheus-values.yaml  --set=alertmanager.enabled=true -f ./grafana/alertmanager.yml"
+                                sh "helm upgrade  prometheus-ops stable/prometheus --install -wait --namespace lma --values prometheus-values.yaml  --set=alertmanager.enabled=true -f ./prometheus/alertmanager.yml"
                             }
                         }
                     }
