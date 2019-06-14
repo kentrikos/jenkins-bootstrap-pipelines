@@ -37,6 +37,7 @@ pipeline {
                                                    returnStdout: true).trim().replaceAll("\\.\$", "")
                             prometheusEndpoint = "prometheus." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
                             grafanaEndpoint = "grafana." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
+                            alertmanagerEndpoint = "alertmanager." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
                         }
                     }
                 }
@@ -50,8 +51,10 @@ pipeline {
                         script {
                             sh """
                             #!/bin/bash
-                            helm install --replace --wait --name prometheus-ops --namespace lma stable/prometheus \
-                            --set=server.ingress.enabled=true,server.ingress.hosts={$prometheusEndpoint}
+                            helm upgrade  prometheus-ops stable/prometheus --install -wait  --namespace lma \
+                            --set=server.ingress.enabled=true,server.ingress.hosts={$prometheusEndpoint} \
+                            --set=alertmanager.enabled=true --set=alertmanager.ingress.enabled=true --set=alertmanager.ingress.hosts={$alertmanagerEndpoint} \
+                            -f ./prometheus/alertmanager.yml
                             """
                         }
                     }
