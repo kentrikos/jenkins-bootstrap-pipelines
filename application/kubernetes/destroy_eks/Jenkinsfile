@@ -29,7 +29,7 @@ pipeline {
                 ok "Yes, we should."
             }
             steps {
-                terraformApplyDestroy dir: "$OPERATION_DIR", withAWS: true
+                terraformDestroy dir: "$OPERATION_DIR", withAWS: true
             }
         }
     }
