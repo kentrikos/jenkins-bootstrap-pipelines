@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2019-07-30
+### Added
+- Step for direct terraform destroy for avoiding tf 0.12 cycle problems
+
 ## [0.9.0] - 2019-06-14
 ### Changed 
 - Change prometheus installation methods to use helm upgrade
