@@ -1,0 +1,37 @@
+#!groovy
+
+library 'kentrikos-shared-library'
+pipeline {
+    environment {
+        OPERATION_DIR = "operations/$AWS_REGION/vpc-endpoint-to-vpces"
+        SUBCOMPONENT = "vpc-endpoint-to-vpces"
+    }
+    agent any
+    stages {
+
+        stage('Git clone') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Init') {
+            steps {
+                terraformInitOperations dir: "$OPERATION_DIR", subcomponent: "$SUBCOMPONENT"
+            }
+        }
+        stage('Plan') {
+            steps {
+                terraformPlanDestroy dir: "$OPERATION_DIR"
+            }
+        }
+        stage('Apply') {
+            input {
+                message "Should we continue?"
+                ok "Yes, we should."
+            }
+            steps {
+                terraformApplyDestroy dir: "$OPERATION_DIR"
+            }
+        }
+    }
+}
