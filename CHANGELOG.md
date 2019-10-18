@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2019-10-18
+### Added
+- Dashboard installation job in Application account
+- Dashboard installation job in Operations account
+- Job to create vpces in Application account
+- Job to create endpoint to vpces in Operations account
+
 ## [0.10.0] - 2019-07-30
 ### Added
 - Step for direct terraform destroy for avoiding tf 0.12 cycle problems

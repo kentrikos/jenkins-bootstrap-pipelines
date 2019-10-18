@@ -1,0 +1,57 @@
+#!groovy
+library 'kentrikos-shared-library'
+pipeline {
+    agent any
+    parameters {
+        choice(name: 'K8S_FLAVOR', choices: ["eks", "kops"],
+                description: 'Choose type of Kubernetes cluster (required for kops)')
+    }
+    environment {
+        OPERATION_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+    }
+    stages {
+        stage('Git clone') {
+            steps {
+                gitCloneConfigRepo()
+            }
+        }
+        stage('Switch K8S context') {
+            steps {
+                kubectlSwitchContextApp()
+            }
+        }
+        stage('Read DNS domain') {
+            steps {
+                dir("$OPERATION_DIR") {
+                    withProxyEnv() {
+                        script {
+                            def jenkinsParameters = readYaml file: 'jenkins/parameters.yaml'
+                            println "Getting domain name"
+                            def r53DomainName = sh(script: "aws route53 get-hosted-zone --id " + jenkinsParameters.domainHostedZoneID + " --output text --query 'HostedZone.Name'",
+                                    returnStdout: true).trim().replaceAll("\\.\$", "")
+//                            dashboardEndpoint = "dashboard." + jenkinsParameters.domainAliasPrefix + "." + r53DomainName
+                            dashboardEndpoint = "dashboard." + "app" + "." + r53DomainName
+                        }
+                    }
+                }
+            }
+        }
+        stage('Deploy Dashboard/app') {
+            steps {
+                dir("$OPERATION_DIR") {
+                    withProxyEnv() {
+                        script {
+                            sh """
+                          #!/bin/bash
+                          helm upgrade  dashboard stable/kubernetes-dashboard --install --wait --namespace kube-system \
+                          --set=ingress.enabled=true --set=rpac.clusterAdminRole=true --set=ingress.hosts={$dashboardEndpoint} \
+                          --set=ingress.tls[0].hosts={$dashboardEndpoint} --set=ingress.tls[0].secretName=dashboardtls \
+                          --set=fullnameOverride=dashboard --set=enableInsecureLogin=true --set=rbac.clusterAdminRole=true
+                          """
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
