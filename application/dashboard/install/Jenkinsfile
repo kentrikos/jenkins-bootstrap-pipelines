@@ -7,7 +7,7 @@ pipeline {
                 description: 'Choose type of Kubernetes cluster (required for kops)')
     }
     environment {
-        OPERATION_DIR = "application/$AWS_REGION/env-$K8S_FLAVOR"
+        OPERATION_DIR = "operations/$AWS_REGION/env-$K8S_FLAVOR"
     }
     stages {
         stage('Git clone') {
@@ -40,6 +40,7 @@ pipeline {
             steps {
                 dir("$OPERATION_DIR") {
                     withProxyEnv() {
+                       withAWS(role: "$CROSS_ACCOUNT_ROLE_NAME", roleAccount: "$AWS_APPLICATION_ACCOUNT_NUMBER") {
                         script {
                             sh """
                           #!/bin/bash
@@ -49,6 +50,7 @@ pipeline {
                           --set=fullnameOverride=dashboard --set=enableInsecureLogin=true --set=rbac.clusterAdminRole=true
                           """
                         }
+                      }
                     }
                 }
             }
