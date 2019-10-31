@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2019-10-31
+### Fixed
+- Job for installation of dashboard in Application account
+
 ## [0.11.0] - 2019-10-22
 ### Added
 - Dashboard installation job in Application account
