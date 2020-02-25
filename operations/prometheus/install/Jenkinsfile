@@ -51,7 +51,7 @@ pipeline {
                         script {
                             sh """
                             #!/bin/bash
-                            helm upgrade  prometheus-ops stable/prometheus --install --wait --namespace lma \
+                            helm upgrade prometheus-ops stable/prometheus --install --wait --namespace lma \
                             --set=server.ingress.enabled=true,server.ingress.hosts={$prometheusEndpoint} \
                             --set=alertmanager.enabled=true --set=alertmanager.ingress.enabled=true --set=alertmanager.ingress.hosts={$alertmanagerEndpoint} \
                             -f ./prometheus/alertmanager.yml
